@@ -1,5 +1,6 @@
 #include <stdexcept>
 #include <gtc\type_ptr.hpp>
+#include <limits>
 
 #include "Program.h"
 #include "Shader.h"
@@ -36,7 +37,12 @@ void Program::UnbindProgram()
 
 GLuint Program::GetUniformID(const std::string& name)
 {
-	return glGetUniformLocation(ProgramID, name.c_str());
+	GLuint id = glGetUniformLocation(ProgramID, name.c_str());
+
+	if (id == UINT_MAX)
+		printf("No uniform under the name %S", name); // Invalid ID
+
+	return id;
 }
 
 GLuint Program::GetProgramID()

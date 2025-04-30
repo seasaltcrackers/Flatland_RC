@@ -41,5 +41,11 @@ private:
 
 	void DrawRectangle(Colour* colourData, glm::ivec2 position, glm::ivec2 dimensions, Colour colour);
 
+private:
+
+	// IMGUI:
+
+	bool ShowingCascadesTexture = true;
+
 };
 

@@ -19,9 +19,9 @@ void RadianceCascades::Initialise(int width, int height)
 	CascadesFrameBuffer = new FrameBuffer(cascade0ProbeWidth * 2, cascade0ProbeHeight);
 	
 	RenderProgram = Program::GenerateFromFileVsFs("Resources/Render.vs", "Resources/Render.fs");
-	CascadeProgram = Program::GenerateFromFileVsFs("Resources/Render.vs", "Resources/Cascade.fs");
+	CascadeProgram = Program::GenerateFromFileVsFs("Resources/Cascade.vs", "Resources/Cascade.fs");
 
-	FullscreenQuad = MeshGenerator::GenerateGrid({ 1, 1 }, { 2.0f, 2.0f }, { -1.0f, -1.0f });
+	FullscreenQuad = MeshGenerator::GenerateGrid({ 1, 1 }, { 2.0f, -2.0f }, { -1.0f, 1.0f });
 
 	InitialiseBufferTexture();
 	InitialiseCascadeTexture();
@@ -30,13 +30,16 @@ void RadianceCascades::Initialise(int width, int height)
 void RadianceCascades::Update()
 {
 	ImGui::Begin("Radiance Cascades");
+	ImGui::Checkbox("Show Cascades", &ShowingCascadesTexture);
 	ImGui::End();
 
 	CascadesFrameBuffer->Bind();
 
 	CascadeProgram->BindProgram();
 
-	CascadeProgram->SetTexture("tex", TextureID);
+	CascadeProgram->SetTexture("worldTexture", TextureID);
+	CascadeProgram->SetVector("worldTextureDimensions", glm::vec2{ Width, Height });
+
 	FullscreenQuad->RenderMesh();
 
 	CascadeProgram->UnbindProgram();
@@ -49,7 +52,7 @@ void RadianceCascades::Render()
 	RenderProgram->BindProgram();
 
 	//RenderProgram->SetTexture("tex", TextureID);
-	RenderProgram->SetTexture("tex", CascadesFrameBuffer->GetTexture());
+	RenderProgram->SetTexture("tex", ShowingCascadesTexture ? CascadesFrameBuffer->GetTexture() : TextureID);
 	FullscreenQuad->RenderMesh();
 
 	RenderProgram->UnbindProgram();
