@@ -39,6 +39,14 @@ public:
 	void SetVector(const std::string& name, glm::vec3 value);
 	void SetVector(const std::string& name, glm::vec4 value);
 
+	void SetIVector(GLuint id, glm::ivec2 value);
+	void SetIVector(GLuint id, glm::ivec3 value);
+	void SetIVector(GLuint id, glm::ivec4 value);
+
+	void SetIVector(const std::string& name, glm::ivec2 value);
+	void SetIVector(const std::string& name, glm::ivec3 value);
+	void SetIVector(const std::string& name, glm::ivec4 value);
+
 	void SetMatrix(GLuint id, const glm::mat3x3& value);
 	void SetMatrix(GLuint id, const glm::mat4x4& value);
 

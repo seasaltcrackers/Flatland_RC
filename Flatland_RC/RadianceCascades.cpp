@@ -37,6 +37,9 @@ void RadianceCascades::Update()
 
 	CascadeProgram->BindProgram();
 
+	CascadeProgram->SetIVector("cascade0AngleResolution", glm::ivec2(8, 8));
+	CascadeProgram->SetIVector("cascade0ProbeResolution", glm::ivec2(32, 32));
+
 	CascadeProgram->SetTexture("worldTexture", TextureID);
 	CascadeProgram->SetVector("worldTextureDimensions", glm::vec2{ Width, Height });
 

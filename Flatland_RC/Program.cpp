@@ -4,6 +4,7 @@
 
 #include "Program.h"
 #include "Shader.h"
+#include "Logging.h"
 
 Program::Program(GLuint programID)
 {
@@ -40,7 +41,7 @@ GLuint Program::GetUniformID(const std::string& name)
 	GLuint id = glGetUniformLocation(ProgramID, name.c_str());
 
 	if (id == UINT_MAX)
-		printf("No uniform under the name %S", name); // Invalid ID
+		Logging::LogError("No uniform ID exists under the name '{0}'", name); // Invalid ID
 
 	return id;
 }
@@ -122,6 +123,42 @@ void Program::SetVector(const std::string& name, glm::vec4 value)
 	SetVector(GetUniformID(name), value);
 }
 
+void Program::SetIVector(GLuint id, glm::ivec2 value)
+{
+	ValidateSetUniform(id);
+	glUniform2i(id, value.x, value.y);
+}
+
+void Program::SetIVector(GLuint id, glm::ivec3 value)
+{
+	ValidateSetUniform(id);
+	glUniform3i(id, value.x, value.y, value.z);
+}
+
+void Program::SetIVector(GLuint id, glm::ivec4 value)
+{
+	ValidateSetUniform(id);
+	glUniform4i(id, value.x, value.y, value.z, value.w);
+}
+
+void Program::SetIVector(const std::string& name, glm::ivec2 value)
+{
+	ValidateSetUniform(name);
+	SetIVector(GetUniformID(name), value);
+}
+
+void Program::SetIVector(const std::string& name, glm::ivec3 value)
+{
+	ValidateSetUniform(name);
+	SetIVector(GetUniformID(name), value);
+}
+
+void Program::SetIVector(const std::string& name, glm::ivec4 value)
+{
+	ValidateSetUniform(name);
+	SetIVector(GetUniformID(name), value);
+}
+
 void Program::SetMatrix(GLuint id, const glm::mat3x3& value)
 {
 	ValidateSetUniform(id);
@@ -171,13 +208,13 @@ void Program::SetTexture(const std::string& name, GLuint textureID)
 void Program::ValidateSetUniform(GLuint id)
 {
 	if (!IsBound)
-		printf("Trying to set Program variable while unbound");
+		Logging::ThrowError("Trying to set Program variable while unbound");
 }
 
 void Program::ValidateSetUniform(const std::string& name)
 {
 	if (!IsBound)
-		printf("Trying to set Program variable while unbound");
+		Logging::ThrowError("Trying to set Program variable while unbound");
 }
 
 Program* Program::GenerateFromFileVsFs(const std::string& filepathVs, const std::string& filepathFs)
@@ -208,7 +245,7 @@ Program* Program::GenerateProgram(std::vector<Shader*> shaders)
 	glGetProgramiv(programID, GL_LINK_STATUS, &link_result);
 
 	if (link_result == GL_FALSE)
-		printf(GetProgramErrorLog(shaders, programID).c_str());
+		Logging::ThrowError(GetProgramErrorLog(shaders, programID).c_str());
 
 	return new Program(programID);
 }
