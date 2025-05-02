@@ -11,12 +11,13 @@ void RadianceCascades::Initialise(int width, int height)
 	Width = width;
 	Height = height;
 
-	int angularResolution = 2;
+	AngularResolution = 8;
+	ProbeResolution = 32;
 
-	int cascade0ProbeWidth = (width / 2) * angularResolution;
-	int cascade0ProbeHeight = (height / 2) * angularResolution;
+	CascadeWidth = ProbeResolution * AngularResolution * 2;
+	CascadeHeight = ProbeResolution * AngularResolution;
 
-	CascadesFrameBuffer = new FrameBuffer(cascade0ProbeWidth * 2, cascade0ProbeHeight);
+	CascadesFrameBuffer = new FrameBuffer(CascadeWidth, CascadeHeight);
 	
 	RenderProgram = Program::GenerateFromFileVsFs("Resources/Render.vs", "Resources/Render.fs");
 	CascadeProgram = Program::GenerateFromFileVsFs("Resources/Cascade.vs", "Resources/Cascade.fs");
@@ -37,8 +38,9 @@ void RadianceCascades::Update()
 
 	CascadeProgram->BindProgram();
 
-	CascadeProgram->SetIVector("cascade0AngleResolution", glm::ivec2(8, 8));
-	CascadeProgram->SetIVector("cascade0ProbeResolution", glm::ivec2(32, 32));
+	CascadeProgram->SetIVector("cascade0AngleResolution", glm::ivec2(AngularResolution, AngularResolution));
+	CascadeProgram->SetIVector("cascade0ProbeResolution", glm::ivec2(ProbeResolution, ProbeResolution));
+	CascadeProgram->SetVector("cascadeTextureDimensions", glm::vec2(CascadeWidth, CascadeHeight));
 
 	CascadeProgram->SetTexture("worldTexture", TextureID);
 	CascadeProgram->SetVector("worldTextureDimensions", glm::vec2{ Width, Height });

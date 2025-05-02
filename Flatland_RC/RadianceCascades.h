@@ -25,8 +25,14 @@ private:
 
 	GLuint TextureID = 0;
 
+	int AngularResolution = 0;
+	int ProbeResolution = 0;
+
 	int Width = 0;
 	int Height = 0;
+
+	int CascadeWidth = 0;
+	int CascadeHeight = 0;
 
 	void InitialiseBufferTexture();
 	void InitialiseCascadeTexture();

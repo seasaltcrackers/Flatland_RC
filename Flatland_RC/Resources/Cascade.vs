@@ -6,11 +6,11 @@ layout (location = 1) in vec2 texCoord;
 out vec2 fragTexCoord;
 out vec2 fragPixelCoord;
 
-uniform vec2 worldTextureDimensions;
+uniform vec2 cascadeTextureDimensions;
 
 void main()
 {
 	gl_Position = vec4(position, 0.0f, 1.0f);
 	fragTexCoord = texCoord;
-    fragPixelCoord = texCoord * worldTextureDimensions;
+    fragPixelCoord = texCoord * cascadeTextureDimensions;
 }
