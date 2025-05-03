@@ -12,12 +12,11 @@ out vec4 color;
 
 uniform int mergeToCascade;
 
-uniform float cascade0IntervalLength;
-uniform ivec2 cascade0ProbeResolution;
-uniform ivec2 cascade0AngleResolution;
+uniform ivec2 mergeFromProbeResolution;
+uniform ivec2 mergeToProbeResolution;
 
-uniform sampler2D worldTexture;
-uniform vec2 worldTextureDimensions;
+uniform ivec2 mergeFromAngleResolution;
+uniform ivec2 mergeToAngleResolution;
 
 uniform sampler2D cascadeTexture;
 uniform vec2 cascadeTextureDimensions;
@@ -73,6 +72,33 @@ uniform vec2 cascadeTextureDimensions;
 //    return ivec2(floor(position / angularResolution));
 //}
 
+void mergeIntervals(ivec2 probeCoordinates, int mergeToDirection)
+{
+    vec2 probeUpperLeft = probeCoordinates * samplePosition;
+
+    // Loop over every direction to sample in from cascade
+    for (int directionOffset = 0; directionOffset < 4; ++directionOffset)
+    {
+        // Loop over every probe in from cascade
+        for (int yOffset = 0; yOffset < 2; ++yOffset)
+        {
+            for (int xOffset = 0; xOffset < 2; ++xOffset)
+            {
+                ivec2 offset = ivec2(xOffset, yOffset);
+                
+                int mergeFromAngleIndex = mergeToDirection * 4 + directionOffset;
+
+                ivec2 mergeFromAngleCoord = ivec2(
+                    mergeFromAngleIndex % mergeFromAngleResolution.x
+                    mergeFromAngleIndex / mergeFromAngleResolution.x
+                );
+
+                ivec2 samplePosition = + mergeFromAngleCoord
+            }
+        }
+    }
+}
+
 void main(void)
 {
     // Get current origin position & raycast direction
@@ -80,8 +106,18 @@ void main(void)
     // Get nearest cascade + 1 probe relavent directions
 
     // Merge into current raycast direction
+
+    //color = vec4(floor(fromProbeCoord) / mergeFromProbeResolution, 0.0f, 1.0f);
+    //color = vec4(floor(toProbeCoord) / mergeToProbeResolution, 0.0f, 1.0f);
     color = vec4(mergeToCascade.rrr / 10.0f, 1.0f);
 
+    // Get pixel index
+    ivec2 angleCoord = ivec2(toPixelCoord);
+    angleCoord %= mergeToAngleResolution;
+
+    int toAngleIndex = angleCoord.y * mergeToAngleResolution.x + angleCoord.x;
+    
+    color = vec4(vec2(angleCoord) / mergeToAngleResolution, 0.0f, 1.0f);
 
     // We need to find the probe coordinate of the current pixel
 
