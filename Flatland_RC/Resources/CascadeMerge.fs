@@ -2,8 +2,11 @@
 
 #define M_PI 3.1415926535897932384626433832795
 
-in vec2 fragTexCoord;
-in vec2 fragPixelCoord;
+in vec2 fromProbeCoord;
+in vec2 toProbeCoord;
+
+in vec2 fromPixelCoord;
+in vec2 toPixelCoord;
 
 out vec4 color;
 
@@ -84,7 +87,7 @@ void main(void)
 
     // We need to find the 4 closest probes on cascade + 1
 
-    
+
 
     //CascadePositionToProbeCoordinate();
 

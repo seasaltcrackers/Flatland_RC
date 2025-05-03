@@ -62,9 +62,12 @@ void RadianceCascades::Update()
 		int mergeFromCascade = cascade + 1;
 		int mergeToCascade = cascade;
 
-		float currentXOffset = 1.0f - std::powf(0.5f, mergeToCascade);
-		float nextXOffset = 1.0f - std::powf(0.5f, mergeFromCascade);
-		float xScale = nextXOffset - currentXOffset;
+		float xOffset1 = 1.0f - std::powf(0.5f, mergeToCascade);
+		float xOffset2 = 1.0f - std::powf(0.5f, mergeFromCascade);
+		float xOffset3 = 1.0f - std::powf(0.5f, mergeFromCascade + 1);
+
+		float toXScale = xOffset2 - xOffset1;
+		float fromXScale = xOffset3 - xOffset2;
 
 		CascadeMergeProgram->SetIVector("mergeFromProbeResolution", CalculateProbeResolution(mergeFromCascade));
 		CascadeMergeProgram->SetIVector("mergeToProbeResolution", CalculateProbeResolution(mergeToCascade));
@@ -75,7 +78,8 @@ void RadianceCascades::Update()
 		CascadeMergeProgram->SetInt("mergeFromCascade", mergeFromCascade);
 		CascadeMergeProgram->SetInt("mergeToCascade", mergeToCascade);
 
-		CascadeMergeProgram->SetVector("horizontalTransform", glm::vec2(currentXOffset, xScale));
+		CascadeMergeProgram->SetVector("fromHorizontalTransform", glm::vec2(xOffset2, fromXScale));
+		CascadeMergeProgram->SetVector("toHorizontalTransform", glm::vec2(xOffset1, toXScale));
 
 		FullscreenQuad->RenderMesh();
 	}

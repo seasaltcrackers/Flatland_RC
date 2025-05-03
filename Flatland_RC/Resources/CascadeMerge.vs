@@ -10,7 +10,10 @@ out vec2 fromPixelCoord;
 out vec2 toPixelCoord;
 
 uniform vec2 cascadeTextureDimensions;
-uniform vec2 horizontalTransform; // { offset, scale }
+ 
+// { offset, scale }
+uniform vec2 fromHorizontalTransform;
+uniform vec2 toHorizontalTransform; 
 
 uniform ivec2 mergeFromProbeResolution;
 uniform ivec2 mergeToProbeResolution;
@@ -24,6 +27,13 @@ void main()
     
 	gl_Position = vec4(position, 0.0f, 1.0f);
     gl_Position.x = (transformedTexCoordX * 2.0f) - 1.0f; // Remap to -1.0f -> 1.0f;
+
+    fromProbeCoord
+    toProbeCoord
+
+    fromPixelCoord
+    toPixelCoord
+
 
 	fragTexCoord = texCoord;
     fragTexCoord.x = transformedTexCoordX;
