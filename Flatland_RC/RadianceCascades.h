@@ -20,13 +20,17 @@ private:
 	FrameBuffer* CascadesFrameBuffer = nullptr;
 
 	Program* RenderProgram = nullptr;
-	Program* CascadeProgram = nullptr;
+	Program* CascadeGenerateProgram = nullptr;
+	Program* CascadeMergeProgram = nullptr;
 	Mesh* FullscreenQuad = nullptr;
 
 	GLuint TextureID = 0;
 
-	int AngularResolution = 0;
-	int ProbeResolution = 0;
+	int MaximumCascades = 0;
+
+	float Cascade0IntervalLength= 0;
+	glm::ivec2 Cascade0AngularResolution;
+	glm::ivec2 Cascade0ProbeResolution;
 
 	int Width = 0;
 	int Height = 0;
@@ -37,6 +41,9 @@ private:
 	void InitialiseBufferTexture();
 	void InitialiseCascadeTexture();
 
+	glm::vec2 CalculateIntervalMinMax(int cascade);
+	glm::ivec2 CalculateProbeResolution(int cascade);
+	glm::ivec2 CalculateAngleResolution(int cascade);
 
 	struct Colour
 	{

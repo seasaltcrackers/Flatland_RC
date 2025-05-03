@@ -11,16 +11,19 @@ void RadianceCascades::Initialise(int width, int height)
 	Width = width;
 	Height = height;
 
-	AngularResolution = 8;
-	ProbeResolution = 32;
+	MaximumCascades = 6;
+	Cascade0IntervalLength = 4.0f;
+	Cascade0AngularResolution = glm::ivec2(8, 8);
+	Cascade0ProbeResolution = glm::ivec2(32, 32);
 
-	CascadeWidth = ProbeResolution * AngularResolution * 2;
-	CascadeHeight = ProbeResolution * AngularResolution;
+	CascadeWidth = Cascade0ProbeResolution.x * Cascade0AngularResolution.x * 2;
+	CascadeHeight = Cascade0ProbeResolution.y * Cascade0AngularResolution.y;
 
 	CascadesFrameBuffer = new FrameBuffer(CascadeWidth, CascadeHeight);
 	
 	RenderProgram = Program::GenerateFromFileVsFs("Resources/Render.vs", "Resources/Render.fs");
-	CascadeProgram = Program::GenerateFromFileVsFs("Resources/Cascade.vs", "Resources/Cascade.fs");
+	CascadeGenerateProgram = Program::GenerateFromFileVsFs("Resources/CascadeGenerate.vs", "Resources/CascadeGenerate.fs");
+	CascadeMergeProgram = Program::GenerateFromFileVsFs("Resources/CascadeMerge.vs", "Resources/CascadeMerge.fs");
 
 	FullscreenQuad = MeshGenerator::GenerateGrid({ 1, 1 }, { 2.0f, -2.0f }, { -1.0f, 1.0f });
 
@@ -36,19 +39,48 @@ void RadianceCascades::Update()
 
 	CascadesFrameBuffer->Bind();
 
-	CascadeProgram->BindProgram();
+	CascadeGenerateProgram->BindProgram();
 
-	CascadeProgram->SetIVector("cascade0AngleResolution", glm::ivec2(AngularResolution, AngularResolution));
-	CascadeProgram->SetIVector("cascade0ProbeResolution", glm::ivec2(ProbeResolution, ProbeResolution));
-	CascadeProgram->SetVector("cascadeTextureDimensions", glm::vec2(CascadeWidth, CascadeHeight));
+	CascadeGenerateProgram->SetIVector("cascade0AngleResolution", Cascade0AngularResolution);
+	CascadeGenerateProgram->SetIVector("cascade0ProbeResolution", Cascade0ProbeResolution);
+	CascadeGenerateProgram->SetVector("cascadeTextureDimensions", glm::vec2(CascadeWidth, CascadeHeight));
 
-	CascadeProgram->SetTexture("worldTexture", TextureID);
-	CascadeProgram->SetVector("worldTextureDimensions", glm::vec2{ Width, Height });
+	CascadeGenerateProgram->SetTexture("worldTexture", TextureID);
+	CascadeGenerateProgram->SetVector("worldTextureDimensions", glm::vec2{ Width, Height });
 
 	FullscreenQuad->RenderMesh();
 
-	CascadeProgram->UnbindProgram();
+	CascadeGenerateProgram->UnbindProgram();
 
+	CascadeMergeProgram->BindProgram();
+
+	CascadeMergeProgram->SetTexture("cascadeTexture", CascadesFrameBuffer->GetTexture());
+	CascadeMergeProgram->SetVector("cascadeTextureDimensions", glm::vec2(CascadeWidth, CascadeHeight));
+
+	for (int cascade = MaximumCascades - 2; cascade >= 0; --cascade)
+	{
+		int mergeFromCascade = cascade + 1;
+		int mergeToCascade = cascade;
+
+		float currentXOffset = 1.0f - std::powf(0.5f, mergeToCascade);
+		float nextXOffset = 1.0f - std::powf(0.5f, mergeFromCascade);
+		float xScale = nextXOffset - currentXOffset;
+
+		CascadeMergeProgram->SetIVector("mergeFromProbeResolution", CalculateProbeResolution(mergeFromCascade));
+		CascadeMergeProgram->SetIVector("mergeToProbeResolution", CalculateProbeResolution(mergeToCascade));
+
+		CascadeMergeProgram->SetIVector("mergeFromAngleResolution", CalculateAngleResolution(mergeFromCascade));
+		CascadeMergeProgram->SetIVector("mergeToAngleResolution", CalculateAngleResolution(mergeToCascade));
+
+		CascadeMergeProgram->SetInt("mergeFromCascade", mergeFromCascade);
+		CascadeMergeProgram->SetInt("mergeToCascade", mergeToCascade);
+
+		CascadeMergeProgram->SetVector("horizontalTransform", glm::vec2(currentXOffset, xScale));
+
+		FullscreenQuad->RenderMesh();
+	}
+
+	CascadeMergeProgram->UnbindProgram();
 	CascadesFrameBuffer->Unbind();
 }
 
@@ -56,7 +88,6 @@ void RadianceCascades::Render()
 {
 	RenderProgram->BindProgram();
 
-	//RenderProgram->SetTexture("tex", TextureID);
 	RenderProgram->SetTexture("tex", ShowingCascadesTexture ? CascadesFrameBuffer->GetTexture() : TextureID);
 	FullscreenQuad->RenderMesh();
 
@@ -100,4 +131,25 @@ void RadianceCascades::DrawRectangle(Colour* colourData, glm::ivec2 position, gl
 		for (int x = position.x; x < std::min(position.x + dimensions.x, Width - 1); ++x)
 			colourData[y * Width + x] = colour;
 	}
+}
+
+glm::vec2 RadianceCascades::CalculateIntervalMinMax(int cascade)
+{
+    float intervalLength = Cascade0IntervalLength * pow(2.0f, cascade);
+    float intervalOffset = intervalLength * (2.0f / 3.0f);
+    return glm::vec2(intervalOffset, intervalOffset + intervalLength);
+}
+
+glm::ivec2 RadianceCascades::CalculateProbeResolution(int cascade)
+{
+    return glm::ivec2(
+        std::ceilf(Cascade0ProbeResolution.x / std::powf(2.0f, cascade)),
+		std::ceilf(Cascade0ProbeResolution.y / std::powf(2.0f, cascade)));
+}
+
+glm::ivec2 RadianceCascades::CalculateAngleResolution(int cascade)
+{
+    return glm::ivec2(
+		Cascade0AngularResolution.x,
+		Cascade0AngularResolution.y * std::pow(2, cascade));
 }
