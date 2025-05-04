@@ -11,7 +11,7 @@ void RadianceCascades::Initialise(int width, int height)
 	Width = width;
 	Height = height;
 
-	MaximumCascades = 6;
+	MaximumCascades = 3;
 	Cascade0IntervalLength = 4.0f;
 	Cascade0AngularResolution = glm::ivec2(8, 8);
 	Cascade0ProbeResolution = glm::ivec2(32, 32);
@@ -56,34 +56,42 @@ void RadianceCascades::Update()
 
 	CascadeMergeProgram->SetTexture("cascadeTexture", CascadesFrameBuffer->GetTexture());
 	CascadeMergeProgram->SetVector("cascadeTextureDimensions", glm::vec2(CascadeWidth, CascadeHeight));
-
+	
 	for (int cascade = MaximumCascades - 2; cascade >= 0; --cascade)
 	{
+		glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
 		int mergeFromCascade = cascade + 1;
 		int mergeToCascade = cascade;
-
+	
 		float xOffset1 = 1.0f - std::powf(0.5f, mergeToCascade);
 		float xOffset2 = 1.0f - std::powf(0.5f, mergeFromCascade);
 		float xOffset3 = 1.0f - std::powf(0.5f, mergeFromCascade + 1);
-
+	
 		float toXScale = xOffset2 - xOffset1;
 		float fromXScale = xOffset3 - xOffset2;
-
+	
+		CascadeMergeProgram->SetFloat("mergeFromLeftPositionX", xOffset2 * CascadeWidth);
+		CascadeMergeProgram->SetFloat("mergeToLeftPositionX", xOffset1 * CascadeWidth);
+	
 		CascadeMergeProgram->SetIVector("mergeFromProbeResolution", CalculateProbeResolution(mergeFromCascade));
 		CascadeMergeProgram->SetIVector("mergeToProbeResolution", CalculateProbeResolution(mergeToCascade));
-
+	
 		CascadeMergeProgram->SetIVector("mergeFromAngleResolution", CalculateAngleResolution(mergeFromCascade));
 		CascadeMergeProgram->SetIVector("mergeToAngleResolution", CalculateAngleResolution(mergeToCascade));
-
+	
 		CascadeMergeProgram->SetInt("mergeFromCascade", mergeFromCascade);
 		CascadeMergeProgram->SetInt("mergeToCascade", mergeToCascade);
-
+	
 		CascadeMergeProgram->SetVector("fromHorizontalTransform", glm::vec2(xOffset2, fromXScale));
 		CascadeMergeProgram->SetVector("toHorizontalTransform", glm::vec2(xOffset1, toXScale));
-
+	
 		FullscreenQuad->RenderMesh();
-	}
 
+		// DEBUG
+		//break;
+	}
+	
 	CascadeMergeProgram->UnbindProgram();
 	CascadesFrameBuffer->Unbind();
 }
@@ -116,7 +124,7 @@ void RadianceCascades::InitialiseBufferTexture()
 	Colour* data = new Colour[size];
 	std::fill(data, data + size, Colour{ 0, 0, 0 });
 
-	DrawRectangle(data, { 100, 100 }, { 200, 10 }, { 255, 255, 255 });
+	DrawRectangle(data, { 100, 100 }, { 200, 200 }, { 255, 255, 255 });
 
 	// Set texture data
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, Width, Height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
