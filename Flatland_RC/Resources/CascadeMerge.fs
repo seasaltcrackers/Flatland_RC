@@ -24,57 +24,6 @@ uniform ivec2 mergeToAngleResolution;
 uniform sampler2D cascadeTexture;
 uniform vec2 cascadeTextureDimensions;
 
-//vec3 Raycast(vec2 rayOrigin, vec2 rayDirection, float intervalMin, float intervalMax)
-//{
-//    for (float rayDistance = intervalMin; rayDistance <= intervalMax; rayDistance += 1.0f)
-//    {
-//        vec2 samplePosition = rayOrigin + rayDirection * rayDistance;
-//        vec4 color = texture(worldTexture, samplePosition / worldTextureDimensions);
-//
-//        if (color.a == 1.0f)
-//            return color.rgb;
-//    }
-//
-//    return vec3(0.0f, 0.0f, 0.0f);
-//}
-//
-//vec2 CalculateIntervalMinMax(int cascade)
-//{
-//    float intervalLength = cascade0IntervalLength * pow(2.0f, cascade);
-//    float intervalOffset = intervalLength * (2.0f / 3.0f);
-//    return vec2(intervalOffset, intervalOffset + intervalLength);
-//}
-//
-//ivec2 CalculateProbeResolution(int cascade)
-//{
-//    return ivec2(
-//        ceil(cascade0ProbeResolution.x / pow(2.0f, cascade)),
-//        ceil(cascade0ProbeResolution.y / pow(2.0f, cascade)));
-//}
-//
-//ivec2 CalculateAngleResolution(int cascade)
-//{
-//    return ivec2(
-//        cascade0AngleResolution.x,
-//        cascade0AngleResolution.y * pow(2, cascade));
-//}
-//
-//vec2 ProbeCoordinateToWorldPosition(ivec2 probeResolution, ivec2 coords)
-//{
-//    // Divide by resolution + 1 so the grid sits away from the edges of the screen
-//    vec2 probeSpacing = worldTextureDimensions / (probeResolution + 1);
-//
-//    // Add 1 here because otherwise it would be the coordinates would start flush from the top left corner
-//    return probeSpacing * (coords + 1);
-//}
-//
-//ivec2 CascadePositionToProbeCoordinate(int cascade, ivec2 angularResolution, vec2 position)
-//{
-//    float cascadeStartXNormalized = 1.0f - pow(0.5f, cascade);
-//    position.x -= (cascadeStartXNormalized * cascadeTextureDimensions.x);
-//    return ivec2(floor(position / angularResolution));
-//}
-
 vec4 mergeThing(vec4 near, vec4 far)
 {   
     vec3 radiance = near.rgb + (far.rgb * near.a);
@@ -92,14 +41,9 @@ vec4 bilinearWeights(vec2 ratio) {
 
 vec4 mergeIntervals(vec4 toRadiance, ivec2 toProbeCoordinates, ivec2 fromProbeCoordinates, int mergeToAngleIndex)
 {
-    vec2 probeUpperLeft = fromProbeCoordinates * mergeFromAngleResolution;
-    probeUpperLeft.x += mergeFromLeftPositionX;
-
     vec2 toProbeInFromCoordSpace = (vec2(toProbeCoordinates * mergeToAngleResolution) * vec2(0.5f, 1.0f)) / mergeFromAngleResolution;
     vec2 bilinearRatio = fract(toProbeInFromCoordSpace);
     vec4 weights = bilinearWeights(bilinearRatio);
-
-    //return vec4(bilinearRatio, 0.0f, 1.0f);
     
     vec4 radiance = vec4(0.0f, 0.0f, 0.0f, 0.0f);
 
@@ -121,18 +65,12 @@ vec4 mergeIntervals(vec4 toRadiance, ivec2 toProbeCoordinates, ivec2 fromProbeCo
 
                 ivec2 mergeFromAngleCoord = ivec2(
                     mergeFromAngleIndex % mergeFromAngleResolution.x,
-                    floor(mergeFromAngleIndex / mergeFromAngleResolution.x));
+                    floor(mergeFromAngleIndex / float(mergeFromAngleResolution.x)));
 
                 vec2 samplePosition = probeTopLeftPosition + mergeFromAngleCoord;
-
-                //return vec4(probeTopLeftPosition / cascadeTextureDimensions, 0.0f, 1.0f);
-
                 vec4 fromRadiance = texture(cascadeTexture, samplePosition / cascadeTextureDimensions);
                 radiance += mergeThing(toRadiance, fromRadiance) * weights[yOffset * 2 + xOffset];
-                //colour += sampleColour;
             }
-            
-            //return colour * 0.5f;
         }
     }
 
@@ -157,15 +95,17 @@ void main(void)
 
     int toAngleIndex = angleCoord.y * mergeToAngleResolution.x + angleCoord.x;
     
-    vec4 near = texture(cascadeTexture, toPixelCoord); 
+    vec4 near = texture(cascadeTexture, toPixelCoord / cascadeTextureDimensions);
     vec4 far = mergeIntervals(near, ivec2(floor(toProbeCoord)), ivec2(floor(fromProbeCoord)), toAngleIndex);
     
     //color = mergeThing(near, far);
 
     color = far;
-    //color = vec4(floor(toProbeCoord) / mergeToProbeResolution, 0.0f, 1.0f);
+    //color = vec4((toAngleIndex / float(mergeToAngleResolution.x * mergeToAngleResolution.y)).rrr, 1.0f);
 
-    color = mix(vec4(vec2(angleCoord) / mergeToAngleResolution, 0.0f, 1.0f), color, color.a);
+    //color = vec4(floor(fromProbeCoord) / mergeFromProbeResolution, 0.0f, 1.0f);
+
+    //color = mix(vec4(vec2(angleCoord) / mergeToAngleResolution, 0.0f, 1.0f), color, color.a);
     //color = vec4(vec2(angleCoord) / mergeToAngleResolution, 0.0f, 1.0f);
 
     //color = vec4(vec2(angleCoord) / mergeToAngleResolution, 0.0f, 1.0f);

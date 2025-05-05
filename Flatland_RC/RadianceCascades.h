@@ -20,6 +20,7 @@ private:
 	FrameBuffer* CascadesFrameBuffer = nullptr;
 
 	Program* RenderProgram = nullptr;
+	Program* CascadeRenderProgram = nullptr;
 	Program* CascadeGenerateProgram = nullptr;
 	Program* CascadeMergeProgram = nullptr;
 	Mesh* FullscreenQuad = nullptr;
@@ -50,6 +51,7 @@ private:
 		GLubyte R;
 		GLubyte G;
 		GLubyte B;
+		GLubyte A;
 	};
 
 	void DrawRectangle(Colour* colourData, glm::ivec2 position, glm::ivec2 dimensions, Colour colour);
@@ -58,7 +60,7 @@ private:
 
 	// IMGUI:
 
-	bool ShowingCascadesTexture = true;
+	int CurrentStage = 0;
 
 };
 

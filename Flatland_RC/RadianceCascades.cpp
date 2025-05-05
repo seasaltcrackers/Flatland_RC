@@ -11,10 +11,10 @@ void RadianceCascades::Initialise(int width, int height)
 	Width = width;
 	Height = height;
 
-	MaximumCascades = 3;
+	MaximumCascades = 10;
 	Cascade0IntervalLength = 4.0f;
-	Cascade0AngularResolution = glm::ivec2(8, 8);
-	Cascade0ProbeResolution = glm::ivec2(32, 32);
+	Cascade0AngularResolution = glm::ivec2(2, 2);
+	Cascade0ProbeResolution = glm::ivec2(256, 256);
 
 	CascadeWidth = Cascade0ProbeResolution.x * Cascade0AngularResolution.x * 2;
 	CascadeHeight = Cascade0ProbeResolution.y * Cascade0AngularResolution.y;
@@ -22,6 +22,7 @@ void RadianceCascades::Initialise(int width, int height)
 	CascadesFrameBuffer = new FrameBuffer(CascadeWidth, CascadeHeight);
 	
 	RenderProgram = Program::GenerateFromFileVsFs("Resources/Render.vs", "Resources/Render.fs");
+	CascadeRenderProgram = Program::GenerateFromFileVsFs("Resources/CascadeRender.vs", "Resources/CascadeRender.fs");
 	CascadeGenerateProgram = Program::GenerateFromFileVsFs("Resources/CascadeGenerate.vs", "Resources/CascadeGenerate.fs");
 	CascadeMergeProgram = Program::GenerateFromFileVsFs("Resources/CascadeMerge.vs", "Resources/CascadeMerge.fs");
 
@@ -34,13 +35,15 @@ void RadianceCascades::Initialise(int width, int height)
 void RadianceCascades::Update()
 {
 	ImGui::Begin("Radiance Cascades");
-	ImGui::Checkbox("Show Cascades", &ShowingCascadesTexture);
+	ImGui::SliderFloat("Interval", &Cascade0IntervalLength, 0.1f, 100.0f);
+	ImGui::Combo("Test", &CurrentStage, "Final\0Cascades\0World");
 	ImGui::End();
 
 	CascadesFrameBuffer->Bind();
 
 	CascadeGenerateProgram->BindProgram();
 
+	CascadeGenerateProgram->SetFloat("cascade0IntervalLength", Cascade0IntervalLength);
 	CascadeGenerateProgram->SetIVector("cascade0AngleResolution", Cascade0AngularResolution);
 	CascadeGenerateProgram->SetIVector("cascade0ProbeResolution", Cascade0ProbeResolution);
 	CascadeGenerateProgram->SetVector("cascadeTextureDimensions", glm::vec2(CascadeWidth, CascadeHeight));
@@ -98,12 +101,41 @@ void RadianceCascades::Update()
 
 void RadianceCascades::Render()
 {
-	RenderProgram->BindProgram();
+	if (CurrentStage == 0)
+	{
+		CascadeRenderProgram->BindProgram();
 
-	RenderProgram->SetTexture("tex", ShowingCascadesTexture ? CascadesFrameBuffer->GetTexture() : TextureID);
-	FullscreenQuad->RenderMesh();
+		CascadeRenderProgram->SetIVector("cascade0AngleResolution", Cascade0AngularResolution);
+		CascadeRenderProgram->SetIVector("cascade0Dimensions", Cascade0AngularResolution * Cascade0ProbeResolution);
 
-	RenderProgram->UnbindProgram();
+		CascadeRenderProgram->SetTexture("worldTexture", TextureID);
+		CascadeRenderProgram->SetVector("worldTextureDimensions", glm::vec2{ Width, Height });
+
+		CascadeRenderProgram->SetTexture("cascadeTexture", CascadesFrameBuffer->GetTexture());
+		CascadeRenderProgram->SetVector("cascadeTextureDimensions", glm::vec2(CascadeWidth, CascadeHeight));
+
+		FullscreenQuad->RenderMesh();
+
+		CascadeRenderProgram->UnbindProgram();
+	}
+	else if (CurrentStage == 1)
+	{
+		RenderProgram->BindProgram();
+
+		RenderProgram->SetTexture("tex", CascadesFrameBuffer->GetTexture());
+		FullscreenQuad->RenderMesh();
+
+		RenderProgram->UnbindProgram();
+	}
+	else if (CurrentStage == 2)
+	{
+		RenderProgram->BindProgram();
+
+		RenderProgram->SetTexture("tex", TextureID);
+		FullscreenQuad->RenderMesh();
+
+		RenderProgram->UnbindProgram();
+	}
 }
 
 void RadianceCascades::InitialiseBufferTexture()
@@ -122,12 +154,14 @@ void RadianceCascades::InitialiseBufferTexture()
 	// Generate texture data, empty black
 	int size = Width * Height;
 	Colour* data = new Colour[size];
-	std::fill(data, data + size, Colour{ 0, 0, 0 });
+	std::fill(data, data + size, Colour{ 0, 0, 0, 0 });
 
-	DrawRectangle(data, { 100, 100 }, { 200, 200 }, { 255, 255, 255 });
+	DrawRectangle(data, { 250, 250 }, { 20, 20 }, { 255, 255, 255, 255 });
+	DrawRectangle(data, { 350, 250 }, { 20, 100 }, { 255, 0, 0, 255 });
+	DrawRectangle(data, { 50, 250 }, { 20, 100 }, { 0, 0, 255, 255 });
 
 	// Set texture data
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, Width, Height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, Width, Height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 }

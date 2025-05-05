@@ -16,22 +16,33 @@ uniform sampler2D worldTexture;
 uniform vec2 worldTextureDimensions;
 
 
-vec3 Raycast(vec2 rayOrigin, vec2 rayDirection, float intervalMin, float intervalMax)
+vec4 Raycast(vec2 rayOrigin, vec2 rayDirection, float intervalMin, float intervalMax)
 {
-    for (float rayDistance = intervalMin; rayDistance <= intervalMax; rayDistance += 1.0f)
+    for (float rayDistance = intervalMin; rayDistance <= intervalMax; rayDistance += 0.5f)
     {
         vec2 samplePosition = rayOrigin + rayDirection * rayDistance;
         vec4 color = texture(worldTexture, samplePosition / worldTextureDimensions);
 
         if (color.a == 1.0f)
-            return color.rgb;
+            return color;
     }
 
-    return vec3(0.0f, 0.0f, 0.0f);
+    return vec4(0.0f, 0.0f, 0.0f, 0.0f);
+}
+
+float IntervalScale(int cascade) 
+{
+    //if (cascade <= 0) 
+    //    return 0.0;
+
+    /* Scale interval by 2x each cascade */
+    return float(1 << (cascade));
 }
 
 vec2 CalculateIntervalMinMax(int cascade)
 {
+    return cascade0IntervalLength * vec2(IntervalScale(cascade), IntervalScale(cascade + 1));
+
     float intervalLength = cascade0IntervalLength * pow(2.0f, cascade);
     float intervalOffset = intervalLength * (2.0f / 3.0f);
     return vec2(intervalOffset, intervalOffset + intervalLength);
@@ -94,8 +105,8 @@ void main(void)
     vec2 probeCenterWorldPosition = ProbeCoordinateToWorldPosition(probeResolution, probeCoordinate);
 
     // Raycast in the direction 
-    vec3 radiance = Raycast(probeCenterWorldPosition, rayDirection, intervalMinMax.x, intervalMinMax.y);
-    color = vec4(radiance, 1.0f);
+    vec4 radiance = Raycast(probeCenterWorldPosition, rayDirection, intervalMinMax.x, intervalMinMax.y);
+    color = radiance;//vec4(radiance, 1.0f);
 
     //color = vec4(vec2(probePosition) / worldTextureDimensions, 0.0f, 1.0f);
     //color = vec4((probeResolution / 32.0f), 0.0f, 1.0f);
