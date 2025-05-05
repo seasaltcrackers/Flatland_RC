@@ -13,20 +13,49 @@ uniform vec2 cascadeTextureDimensions;
 uniform ivec2 cascade0AngleResolution;
 uniform ivec2 cascade0Dimensions;
 
+vec4 bilinearWeights(vec2 ratio) {
+    return vec4(
+        (1.0f - ratio.x) * (1.0f - ratio.y),
+        ratio.x * (1.0f - ratio.y),
+        (1.0f - ratio.x) * ratio.y,
+        ratio.x * ratio.y
+    );
+}
+
 void main(void)
 {
 	vec4 worldColour = texture(worldTexture, fragTexCoord);
 
-    vec2 topLeft = cascade0Dimensions * fragTexCoord;
+    vec2 cascadePosition = cascade0Dimensions * fragTexCoord;
+    ivec2 topLeftProbeCoordinate = ivec2(floor(cascadePosition / cascade0AngleResolution));
+    vec2 topLeftProbePosition = topLeftProbeCoordinate * cascade0AngleResolution;
+
     vec4 combinedRadiance = vec4(0.0f, 0.0f, 0.0f, 0.0f);
 
-    for (int y = 0; y < cascade0AngleResolution.y; ++y)
+    vec2 toProbeInFromCoordSpace = (cascadePosition / cascade0AngleResolution);
+    vec2 bilinearRatio = fract(toProbeInFromCoordSpace);
+
+    color = vec4(bilinearRatio, 0.0f, 1.0f);
+    return;
+
+    vec4 weights = bilinearWeights(bilinearRatio);
+    
+    for (int probeOffsetY = 0; probeOffsetY < 2; ++probeOffsetY)
     {
-        for (int x = 0; x < cascade0AngleResolution.x; ++x)
+        for (int probeOffsetX = 0; probeOffsetX < 2; ++probeOffsetX)
         {
-            vec2 samplePosition = topLeft + vec2(x, y);
-	        vec4 radiance = texture(cascadeTexture, samplePosition / cascadeTextureDimensions);
-            combinedRadiance += radiance;
+            vec2 probeCoordinateOffset = vec2(probeOffsetX, probeOffsetY);
+            vec2 probePositionOffsetTopLeft = topLeftProbePosition + probeCoordinateOffset * cascade0AngleResolution;
+            
+            for (int directionOffsetY = 0; directionOffsetY < cascade0AngleResolution.y; ++directionOffsetY)
+            {
+                for (int directionOffsetX = 0; directionOffsetX < cascade0AngleResolution.x; ++directionOffsetX)
+                {
+                    vec2 samplePosition = probePositionOffsetTopLeft + vec2(directionOffsetX, directionOffsetY);
+                    vec4 radiance = texture(cascadeTexture, samplePosition / cascadeTextureDimensions);
+                    combinedRadiance += radiance * weights[probeOffsetY * 2 + probeOffsetX];
+                }
+            }
         }
     }
 

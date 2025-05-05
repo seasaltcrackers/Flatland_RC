@@ -21,6 +21,10 @@ vec4 Raycast(vec2 rayOrigin, vec2 rayDirection, float intervalMin, float interva
     for (float rayDistance = intervalMin; rayDistance <= intervalMax; rayDistance += 0.5f)
     {
         vec2 samplePosition = rayOrigin + rayDirection * rayDistance;
+
+        if (any(lessThan(samplePosition, vec2(0, 0))) || any(greaterThan(samplePosition, worldTextureDimensions)))
+            return vec4(0.0f, 0.0f, 0.0f, 0.0f);
+
         vec4 color = texture(worldTexture, samplePosition / worldTextureDimensions);
 
         if (color.a == 1.0f)
@@ -32,8 +36,8 @@ vec4 Raycast(vec2 rayOrigin, vec2 rayDirection, float intervalMin, float interva
 
 float IntervalScale(int cascade) 
 {
-    //if (cascade <= 0) 
-    //    return 0.0;
+    if (cascade <= 0) 
+        return 0.0;
 
     /* Scale interval by 2x each cascade */
     return float(1 << (cascade));

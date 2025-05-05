@@ -53,8 +53,11 @@ vec4 mergeIntervals(vec4 toRadiance, ivec2 toProbeCoordinates, ivec2 fromProbeCo
         for (int xOffset = 0; xOffset < 2; ++xOffset)
         {
             ivec2 probeOffset = ivec2(xOffset, yOffset);
-            
             ivec2 probeCoordinate = (fromProbeCoordinates + probeOffset);
+            
+            if (any(greaterThanEqual(probeCoordinate, mergeFromProbeResolution)))
+                continue;
+
             vec2 probeTopLeftPosition = probeCoordinate * mergeFromAngleResolution;
             probeTopLeftPosition.x += mergeFromLeftPositionX;
 

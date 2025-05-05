@@ -24,7 +24,7 @@ int main(int argc, char** argv)
 	if (!glfwInit())
 		return -1;
 
-	window = glfwCreateWindow(Constants::ScreenWidth, Constants::ScreenHeight, "Hello World", NULL, NULL);
+	window = glfwCreateWindow(1500, 700, "Hello World", NULL, NULL);
 	if (!window)
 	{
 		glfwTerminate();

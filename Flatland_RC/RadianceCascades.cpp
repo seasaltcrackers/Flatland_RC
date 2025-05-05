@@ -12,7 +12,7 @@ void RadianceCascades::Initialise(int width, int height)
 	Height = height;
 
 	MaximumCascades = 10;
-	Cascade0IntervalLength = 4.0f;
+	Cascade0IntervalLength = 5.0f;
 	Cascade0AngularResolution = glm::ivec2(2, 2);
 	Cascade0ProbeResolution = glm::ivec2(256, 256);
 
@@ -35,6 +35,7 @@ void RadianceCascades::Initialise(int width, int height)
 void RadianceCascades::Update()
 {
 	ImGui::Begin("Radiance Cascades");
+	ImGui::SliderInt("Maximum Cascades", &MaximumCascades, 1, 10);
 	ImGui::SliderFloat("Interval", &Cascade0IntervalLength, 0.1f, 100.0f);
 	ImGui::Combo("Test", &CurrentStage, "Final\0Cascades\0World");
 	ImGui::End();
@@ -103,6 +104,8 @@ void RadianceCascades::Render()
 {
 	if (CurrentStage == 0)
 	{
+		glViewport(0, 0, Width, Height);
+
 		CascadeRenderProgram->BindProgram();
 
 		CascadeRenderProgram->SetIVector("cascade0AngleResolution", Cascade0AngularResolution);
@@ -120,6 +123,8 @@ void RadianceCascades::Render()
 	}
 	else if (CurrentStage == 1)
 	{
+		glViewport(0, 0, CascadeWidth, CascadeHeight);
+
 		RenderProgram->BindProgram();
 
 		RenderProgram->SetTexture("tex", CascadesFrameBuffer->GetTexture());
@@ -129,6 +134,8 @@ void RadianceCascades::Render()
 	}
 	else if (CurrentStage == 2)
 	{
+		glViewport(0, 0, Width, Height);
+
 		RenderProgram->BindProgram();
 
 		RenderProgram->SetTexture("tex", TextureID);
