@@ -18,8 +18,12 @@ uniform vec2 worldTextureDimensions;
 
 vec4 Raycast(vec2 rayOrigin, vec2 rayDirection, float intervalMin, float intervalMax)
 {
-    for (float rayDistance = intervalMin; rayDistance <= intervalMax; rayDistance += 0.5f)
+    int steps = max(2, int(round((intervalMax - intervalMin) / 0.5f)));
+
+    for (int i = 0; i < steps; ++i)
     {
+        float rayDistanceT = float(i) / (steps - 1);
+        float rayDistance = mix(intervalMin, intervalMax, rayDistanceT);
         vec2 samplePosition = rayOrigin + rayDirection * rayDistance;
 
         if (any(lessThan(samplePosition, vec2(0, 0))) || any(greaterThan(samplePosition, worldTextureDimensions)))

@@ -61,6 +61,8 @@ private:
 	// IMGUI:
 
 	int CurrentStage = 0;
+	bool OutputBilinearFix = true;
+	bool MergeBilinearFix = true;
 
 };
 

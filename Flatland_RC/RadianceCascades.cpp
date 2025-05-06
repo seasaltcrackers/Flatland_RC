@@ -12,9 +12,9 @@ void RadianceCascades::Initialise(int width, int height)
 	Height = height;
 
 	MaximumCascades = 10;
-	Cascade0IntervalLength = 5.0f;
-	Cascade0AngularResolution = glm::ivec2(2, 2);
-	Cascade0ProbeResolution = glm::ivec2(256, 256);
+	Cascade0IntervalLength = 1.0f;
+	Cascade0AngularResolution = glm::ivec2(4, 4);
+	Cascade0ProbeResolution = glm::ivec2(512, 512);
 
 	CascadeWidth = Cascade0ProbeResolution.x * Cascade0AngularResolution.x * 2;
 	CascadeHeight = Cascade0ProbeResolution.y * Cascade0AngularResolution.y;
@@ -35,9 +35,11 @@ void RadianceCascades::Initialise(int width, int height)
 void RadianceCascades::Update()
 {
 	ImGui::Begin("Radiance Cascades");
-	ImGui::SliderInt("Maximum Cascades", &MaximumCascades, 1, 10);
+	ImGui::SliderInt("Maximum Cascades", &MaximumCascades, 1, 16);
 	ImGui::SliderFloat("Interval", &Cascade0IntervalLength, 0.1f, 100.0f);
-	ImGui::Combo("Test", &CurrentStage, "Final\0Cascades\0World");
+	ImGui::Combo("Stage", &CurrentStage, "Final\0Cascades\0World");
+	ImGui::Checkbox("Output Bilinear Fix", &OutputBilinearFix);
+	ImGui::Checkbox("Merge Bilinear Fix", &MergeBilinearFix);
 	ImGui::End();
 
 	CascadesFrameBuffer->Bind();
@@ -60,7 +62,8 @@ void RadianceCascades::Update()
 
 	CascadeMergeProgram->SetTexture("cascadeTexture", CascadesFrameBuffer->GetTexture());
 	CascadeMergeProgram->SetVector("cascadeTextureDimensions", glm::vec2(CascadeWidth, CascadeHeight));
-	
+	CascadeMergeProgram->SetBool("bilinearFix", MergeBilinearFix);
+
 	for (int cascade = MaximumCascades - 2; cascade >= 0; --cascade)
 	{
 		glMemoryBarrier(GL_ALL_BARRIER_BITS);
@@ -102,11 +105,14 @@ void RadianceCascades::Update()
 
 void RadianceCascades::Render()
 {
+	// Final
 	if (CurrentStage == 0)
 	{
 		glViewport(0, 0, Width, Height);
 
 		CascadeRenderProgram->BindProgram();
+
+		CascadeRenderProgram->SetBool("bilinearFix", OutputBilinearFix);
 
 		CascadeRenderProgram->SetIVector("cascade0AngleResolution", Cascade0AngularResolution);
 		CascadeRenderProgram->SetIVector("cascade0Dimensions", Cascade0AngularResolution * Cascade0ProbeResolution);
@@ -121,6 +127,7 @@ void RadianceCascades::Render()
 
 		CascadeRenderProgram->UnbindProgram();
 	}
+	// Cascades
 	else if (CurrentStage == 1)
 	{
 		glViewport(0, 0, CascadeWidth, CascadeHeight);
@@ -132,6 +139,7 @@ void RadianceCascades::Render()
 
 		RenderProgram->UnbindProgram();
 	}
+	// World
 	else if (CurrentStage == 2)
 	{
 		glViewport(0, 0, Width, Height);
@@ -164,8 +172,8 @@ void RadianceCascades::InitialiseBufferTexture()
 	std::fill(data, data + size, Colour{ 0, 0, 0, 0 });
 
 	DrawRectangle(data, { 250, 250 }, { 20, 20 }, { 255, 255, 255, 255 });
-	DrawRectangle(data, { 350, 250 }, { 20, 100 }, { 255, 0, 0, 255 });
-	DrawRectangle(data, { 50, 250 }, { 20, 100 }, { 0, 0, 255, 255 });
+	//DrawRectangle(data, { 350, 250 }, { 20, 100 }, { 255, 0, 0, 255 });
+	//DrawRectangle(data, { 50, 250 }, { 20, 100 }, { 0, 0, 255, 255 });
 
 	// Set texture data
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, Width, Height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);

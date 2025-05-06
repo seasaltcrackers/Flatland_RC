@@ -60,7 +60,7 @@ int main(int argc, char** argv)
 	glClearColor(1.0, 0.0, 0.0, 1.0); // Black
 
 	RC = new RadianceCascades();
-	RC->Initialise(500, 500);
+	RC->Initialise(512, 512);
 
 
 	while (!glfwWindowShouldClose(window))

@@ -4,6 +4,8 @@ in vec2 fragTexCoord;
 
 out vec4 color;
 
+uniform bool bilinearFix;
+
 uniform sampler2D worldTexture;
 uniform vec2 worldTextureDimensions;
 
@@ -13,7 +15,8 @@ uniform vec2 cascadeTextureDimensions;
 uniform ivec2 cascade0AngleResolution;
 uniform ivec2 cascade0Dimensions;
 
-vec4 bilinearWeights(vec2 ratio) {
+vec4 bilinearWeights(vec2 ratio)
+{
     return vec4(
         (1.0f - ratio.x) * (1.0f - ratio.y),
         ratio.x * (1.0f - ratio.y),
@@ -32,17 +35,19 @@ void main(void)
 
     vec4 combinedRadiance = vec4(0.0f, 0.0f, 0.0f, 0.0f);
 
-    vec2 toProbeInFromCoordSpace = (cascadePosition / cascade0AngleResolution);
-    vec2 bilinearRatio = fract(toProbeInFromCoordSpace);
+    vec4 weights = vec4(1.0f, 1.0f, 1.0f, 1.0f);
+    int probeSampleAmount = bilinearFix ? 2 : 1;
 
-    color = vec4(bilinearRatio, 0.0f, 1.0f);
-    return;
-
-    vec4 weights = bilinearWeights(bilinearRatio);
-    
-    for (int probeOffsetY = 0; probeOffsetY < 2; ++probeOffsetY)
+    if (bilinearFix)
     {
-        for (int probeOffsetX = 0; probeOffsetX < 2; ++probeOffsetX)
+        vec2 toProbeInFromCoordSpace = (cascadePosition / cascade0AngleResolution);
+        vec2 bilinearRatio = fract(toProbeInFromCoordSpace);
+        weights = bilinearWeights(bilinearRatio);
+    }
+    
+    for (int probeOffsetY = 0; probeOffsetY < probeSampleAmount; ++probeOffsetY)
+    {
+        for (int probeOffsetX = 0; probeOffsetX < probeSampleAmount; ++probeOffsetX)
         {
             vec2 probeCoordinateOffset = vec2(probeOffsetX, probeOffsetY);
             vec2 probePositionOffsetTopLeft = topLeftProbePosition + probeCoordinateOffset * cascade0AngleResolution;
