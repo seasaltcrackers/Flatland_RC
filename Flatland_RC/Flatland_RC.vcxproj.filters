@@ -69,6 +69,9 @@
     <ClCompile Include="Dependencies\imgui\imgui_impl_opengl3.cpp">
       <Filter>Header Files\ImGui</Filter>
     </ClCompile>
+    <ClCompile Include="Input.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="RadianceCascades.h">
@@ -129,6 +132,9 @@
       <Filter>Header Files\ImGui</Filter>
     </ClInclude>
     <ClInclude Include="Logging.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Input.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

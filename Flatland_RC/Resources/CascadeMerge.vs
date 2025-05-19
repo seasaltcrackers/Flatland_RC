@@ -3,13 +3,13 @@
 layout (location = 0) in vec2 position;
 layout (location = 1) in vec2 texCoord;
 
-out vec2 fromProbeCoord;
+//out vec2 fromProbeCoord;
 out vec2 toProbeCoord;
-
-out vec2 fromPixelCoord;
 out vec2 toPixelCoord;
+out vec2 worldPosition;
 
 uniform vec2 cascadeTextureDimensions;
+uniform vec2 worldTextureDimensions;
  
 // { offset, scale }
 uniform vec2 fromHorizontalTransform;
@@ -30,9 +30,8 @@ void main()
 	gl_Position = vec4(position, 0.0f, 1.0f);
     gl_Position.x = (toTransformedTexCoordX * 2.0f) - 1.0f; // Remap to -1.0f -> 1.0f
 
-    fromProbeCoord = texCoord * mergeFromProbeResolution;
+    worldPosition = texCoord * worldTextureDimensions;
     toProbeCoord = texCoord * mergeToProbeResolution;
 
-    fromPixelCoord = vec2(fromTransformedTexCoordX, texCoord.y) * cascadeTextureDimensions;
     toPixelCoord = vec2(toTransformedTexCoordX, texCoord.y) * cascadeTextureDimensions;
 }

@@ -18,14 +18,16 @@ public:
 private:
 
 	FrameBuffer* CascadesFrameBuffer = nullptr;
+	FrameBuffer* WorldFrameBuffer = nullptr;
 
 	Program* RenderProgram = nullptr;
+	Program* RenderFullscreenProgram = nullptr;
 	Program* CascadeRenderProgram = nullptr;
 	Program* CascadeGenerateProgram = nullptr;
 	Program* CascadeMergeProgram = nullptr;
 	Mesh* FullscreenQuad = nullptr;
 
-	GLuint TextureID = 0;
+	//GLuint TextureID = 0;
 
 	int MaximumCascades = 0;
 
@@ -39,8 +41,8 @@ private:
 	int CascadeWidth = 0;
 	int CascadeHeight = 0;
 
-	void InitialiseBufferTexture();
-	void InitialiseCascadeTexture();
+	glm::vec2 SquareAPosition = glm::vec2(293.0f, 66.0f);
+	glm::vec2 SquareBPosition = glm::vec2(293.0f, 400.0f);
 
 	glm::vec2 CalculateIntervalMinMax(int cascade);
 	glm::ivec2 CalculateProbeResolution(int cascade);

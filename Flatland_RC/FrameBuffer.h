@@ -6,7 +6,7 @@ class FrameBuffer
 {
 public:
 	
-	FrameBuffer(int width, int height);
+	FrameBuffer(int width, int height, bool includeAlpha, bool bilinear);
 	~FrameBuffer();
 
 public:

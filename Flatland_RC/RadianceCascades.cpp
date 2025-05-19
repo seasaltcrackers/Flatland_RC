@@ -1,10 +1,12 @@
 #include <algorithm>
 #include <imgui.h>
+#include <gtc/matrix_transform.hpp>
 
 #include "RadianceCascades.h"
 #include "Program.h"
 #include "MeshGenerator.h"
 #include "FrameBuffer.h"
+#include "Input.h"
 
 void RadianceCascades::Initialise(int width, int height)
 {
@@ -12,24 +14,23 @@ void RadianceCascades::Initialise(int width, int height)
 	Height = height;
 
 	MaximumCascades = 10;
-	Cascade0IntervalLength = 1.0f;
+	Cascade0IntervalLength = 10.0f;
 	Cascade0AngularResolution = glm::ivec2(4, 4);
-	Cascade0ProbeResolution = glm::ivec2(512, 512);
+	Cascade0ProbeResolution = glm::ivec2(width, height) / 2;
 
 	CascadeWidth = Cascade0ProbeResolution.x * Cascade0AngularResolution.x * 2;
 	CascadeHeight = Cascade0ProbeResolution.y * Cascade0AngularResolution.y;
 
-	CascadesFrameBuffer = new FrameBuffer(CascadeWidth, CascadeHeight);
+	WorldFrameBuffer = new FrameBuffer(Width, Height, true, false);
+	CascadesFrameBuffer = new FrameBuffer(CascadeWidth, CascadeHeight, true, false);
 	
 	RenderProgram = Program::GenerateFromFileVsFs("Resources/Render.vs", "Resources/Render.fs");
+	RenderFullscreenProgram = Program::GenerateFromFileVsFs("Resources/RenderFullscreen.vs", "Resources/RenderFullscreen.fs");
 	CascadeRenderProgram = Program::GenerateFromFileVsFs("Resources/CascadeRender.vs", "Resources/CascadeRender.fs");
 	CascadeGenerateProgram = Program::GenerateFromFileVsFs("Resources/CascadeGenerate.vs", "Resources/CascadeGenerate.fs");
 	CascadeMergeProgram = Program::GenerateFromFileVsFs("Resources/CascadeMerge.vs", "Resources/CascadeMerge.fs");
 
 	FullscreenQuad = MeshGenerator::GenerateGrid({ 1, 1 }, { 2.0f, -2.0f }, { -1.0f, 1.0f });
-
-	InitialiseBufferTexture();
-	InitialiseCascadeTexture();
 }
 
 void RadianceCascades::Update()
@@ -37,10 +38,53 @@ void RadianceCascades::Update()
 	ImGui::Begin("Radiance Cascades");
 	ImGui::SliderInt("Maximum Cascades", &MaximumCascades, 1, 16);
 	ImGui::SliderFloat("Interval", &Cascade0IntervalLength, 0.1f, 100.0f);
-	ImGui::Combo("Stage", &CurrentStage, "Final\0Cascades\0World");
-	ImGui::Checkbox("Output Bilinear Fix", &OutputBilinearFix);
-	ImGui::Checkbox("Merge Bilinear Fix", &MergeBilinearFix);
+	ImGui::Combo("Stage", &CurrentStage, "Final\0Cascades Merged\0Cascades\0World");
+	ImGui::Checkbox("Output Bilinear Interpolate", &OutputBilinearFix);
+	ImGui::Checkbox("Merge Bilinear Interpolate", &MergeBilinearFix);
 	ImGui::End();
+
+	glClearColor(0.0, 0.0, 0.0, 0.0); // Black
+
+	WorldFrameBuffer->Bind();
+
+	RenderProgram->BindProgram();
+	
+	glm::mat4 p = glm::ortho(0.0f, (float)Width, 0.0f, (float)Height, -0.1f, 1000.0f);
+	glm::mat4 v = glm::lookAt(glm::vec3(0.0f, 0.0f, 10.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	glm::mat4 pv = p * v;
+
+	if (Input::IsMouseDown(0) && glm::all(glm::lessThanEqual(Input::GetMousePosition(), glm::vec2(Width, Height))))
+		SquareAPosition = Input::GetMousePosition();
+
+	if (Input::IsMouseDown(1) && glm::all(glm::lessThanEqual(Input::GetMousePosition(), glm::vec2(Width, Height))))
+		SquareBPosition = Input::GetMousePosition();
+
+	glm::mat4 modelA = glm::mat4();
+	modelA = glm::translate(modelA, glm::vec3(SquareAPosition, 0.0f));
+	modelA = glm::scale(modelA, glm::vec3(20.0f, 20.0f, 1.0f));
+
+	glm::mat4 modelB = glm::mat4();
+	modelB = glm::translate(modelB, glm::vec3(SquareBPosition, 0.0f));
+	modelB = glm::scale(modelB, glm::vec3(20.0f, 20.0f, 1.0f));
+
+	glm::mat4 pvmA = pv * modelA;
+	glm::mat4 pvmB = pv * modelB;
+
+	RenderProgram->SetMatrix("PVM", pvmA);
+	RenderProgram->SetVector("colour", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+
+	FullscreenQuad->RenderMesh();
+
+	RenderProgram->SetMatrix("PVM", pvmB);
+	RenderProgram->SetVector("colour", glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+
+	FullscreenQuad->RenderMesh();
+
+	RenderProgram->UnbindProgram();
+
+	WorldFrameBuffer->Unbind();
+
+	glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
 	CascadesFrameBuffer->Bind();
 
@@ -51,17 +95,25 @@ void RadianceCascades::Update()
 	CascadeGenerateProgram->SetIVector("cascade0ProbeResolution", Cascade0ProbeResolution);
 	CascadeGenerateProgram->SetVector("cascadeTextureDimensions", glm::vec2(CascadeWidth, CascadeHeight));
 
-	CascadeGenerateProgram->SetTexture("worldTexture", TextureID);
+	CascadeGenerateProgram->SetTexture("worldTexture", WorldFrameBuffer->GetTexture());
 	CascadeGenerateProgram->SetVector("worldTextureDimensions", glm::vec2{ Width, Height });
 
 	FullscreenQuad->RenderMesh();
 
 	CascadeGenerateProgram->UnbindProgram();
 
+	if (CurrentStage == 2)
+	{
+		CascadesFrameBuffer->Unbind();
+		glClearColor(1.0, 0.0, 0.0, 1.0); // Red
+		return;
+	}
+
 	CascadeMergeProgram->BindProgram();
 
 	CascadeMergeProgram->SetTexture("cascadeTexture", CascadesFrameBuffer->GetTexture());
 	CascadeMergeProgram->SetVector("cascadeTextureDimensions", glm::vec2(CascadeWidth, CascadeHeight));
+	CascadeMergeProgram->SetVector("worldTextureDimensions", glm::vec2{ Width, Height });
 	CascadeMergeProgram->SetBool("bilinearFix", MergeBilinearFix);
 
 	for (int cascade = MaximumCascades - 2; cascade >= 0; --cascade)
@@ -101,6 +153,10 @@ void RadianceCascades::Update()
 	
 	CascadeMergeProgram->UnbindProgram();
 	CascadesFrameBuffer->Unbind();
+
+	glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+	glClearColor(1.0, 0.0, 0.0, 1.0); // Red
 }
 
 void RadianceCascades::Render()
@@ -117,7 +173,7 @@ void RadianceCascades::Render()
 		CascadeRenderProgram->SetIVector("cascade0AngleResolution", Cascade0AngularResolution);
 		CascadeRenderProgram->SetIVector("cascade0Dimensions", Cascade0AngularResolution * Cascade0ProbeResolution);
 
-		CascadeRenderProgram->SetTexture("worldTexture", TextureID);
+		CascadeRenderProgram->SetTexture("worldTexture", WorldFrameBuffer->GetTexture());
 		CascadeRenderProgram->SetVector("worldTextureDimensions", glm::vec2{ Width, Height });
 
 		CascadeRenderProgram->SetTexture("cascadeTexture", CascadesFrameBuffer->GetTexture());
@@ -128,61 +184,29 @@ void RadianceCascades::Render()
 		CascadeRenderProgram->UnbindProgram();
 	}
 	// Cascades
-	else if (CurrentStage == 1)
+	else if (CurrentStage == 1 || CurrentStage == 2)
 	{
 		glViewport(0, 0, CascadeWidth, CascadeHeight);
 
-		RenderProgram->BindProgram();
+		RenderFullscreenProgram->BindProgram();
 
-		RenderProgram->SetTexture("tex", CascadesFrameBuffer->GetTexture());
+		RenderFullscreenProgram->SetTexture("tex", CascadesFrameBuffer->GetTexture());
 		FullscreenQuad->RenderMesh();
 
-		RenderProgram->UnbindProgram();
+		RenderFullscreenProgram->UnbindProgram();
 	}
 	// World
-	else if (CurrentStage == 2)
+	else if (CurrentStage == 3)
 	{
 		glViewport(0, 0, Width, Height);
 
-		RenderProgram->BindProgram();
+		RenderFullscreenProgram->BindProgram();
 
-		RenderProgram->SetTexture("tex", TextureID);
+		RenderFullscreenProgram->SetTexture("tex", WorldFrameBuffer->GetTexture());
 		FullscreenQuad->RenderMesh();
 
-		RenderProgram->UnbindProgram();
+		RenderFullscreenProgram->UnbindProgram();
 	}
-}
-
-void RadianceCascades::InitialiseBufferTexture()
-{
-	glGenTextures(1, &TextureID);
-	glBindTexture(GL_TEXTURE_2D, TextureID);
-
-	// Texture will clamp to the edge if sampled outside of it
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-	// Nearest pixel will be chosen (good for pixel art)
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-	// Generate texture data, empty black
-	int size = Width * Height;
-	Colour* data = new Colour[size];
-	std::fill(data, data + size, Colour{ 0, 0, 0, 0 });
-
-	DrawRectangle(data, { 250, 250 }, { 20, 20 }, { 255, 255, 255, 255 });
-	//DrawRectangle(data, { 350, 250 }, { 20, 100 }, { 255, 0, 0, 255 });
-	//DrawRectangle(data, { 50, 250 }, { 20, 100 }, { 0, 0, 255, 255 });
-
-	// Set texture data
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, Width, Height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-
-	glBindTexture(GL_TEXTURE_2D, 0);
-}
-
-void RadianceCascades::InitialiseCascadeTexture()
-{
 }
 
 void RadianceCascades::DrawRectangle(Colour* colourData, glm::ivec2 position, glm::ivec2 dimensions, Colour colour)

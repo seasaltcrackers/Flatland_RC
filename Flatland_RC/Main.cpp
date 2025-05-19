@@ -10,27 +10,27 @@
 
 #include "RadianceCascades.h"
 #include "Constants.h"
+#include "Input.h"
 
 void Update();
 void Render();
 void Close();
 
 RadianceCascades* RC = nullptr;
+GLFWwindow* Window = nullptr;
 
 int main(int argc, char** argv)
 {
-	GLFWwindow* window;
-
 	if (!glfwInit())
 		return -1;
 
-	window = glfwCreateWindow(1500, 700, "Hello World", NULL, NULL);
-	if (!window)
+	Window = glfwCreateWindow(1500, 700, "Hello World", NULL, NULL);
+	if (!Window)
 	{
 		glfwTerminate();
 		return -1;
 	}
-	glfwMakeContextCurrent(window);
+	glfwMakeContextCurrent(Window);
 
 	GLenum err = glewInit();
 	if (GLEW_OK != err)
@@ -53,17 +53,19 @@ int main(int argc, char** argv)
 	ImGui::StyleColorsDark();
 
 	// Setup Platform/Renderer backends
-	ImGui_ImplGlfw_InitForOpenGL(window, true);
+	ImGui_ImplGlfw_InitForOpenGL(Window, true);
 	ImGui_ImplOpenGL3_Init("#version 130");
+
+	Input::Initialise(Window);
 
 	// Sets the clear color when calling glClear()
 	glClearColor(1.0, 0.0, 0.0, 1.0); // Black
 
 	RC = new RadianceCascades();
-	RC->Initialise(512, 512);
+	RC->Initialise(Constants::TestFactor, Constants::TestFactor);
 
 
-	while (!glfwWindowShouldClose(window))
+	while (!glfwWindowShouldClose(Window))
 	{
 		// Start the Dear ImGui frame
 		ImGui_ImplOpenGL3_NewFrame();
@@ -77,7 +79,7 @@ int main(int argc, char** argv)
 		ImGui::Render();
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-		glfwSwapBuffers(window);
+		glfwSwapBuffers(Window);
 		glfwPollEvents();
 	}
 
