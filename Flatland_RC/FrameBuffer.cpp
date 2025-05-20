@@ -50,11 +50,13 @@ FrameBuffer::~FrameBuffer()
 {
 }
 
-void FrameBuffer::Bind()
+void FrameBuffer::Bind(bool clear)
 {
 	glViewport(0, 0, TextureWidth, TextureHeight);
 	glBindFramebuffer(GL_FRAMEBUFFER, FBO);
-	glClear(GL_COLOR_BUFFER_BIT);
+
+	if (clear)
+		glClear(GL_COLOR_BUFFER_BIT);
 }
 
 

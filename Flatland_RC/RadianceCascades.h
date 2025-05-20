@@ -16,9 +16,10 @@ public:
 	void Render();
 
 private:
-
+	
 	FrameBuffer* CascadesFrameBuffer = nullptr;
-	FrameBuffer* WorldFrameBuffer = nullptr;
+	FrameBuffer* BaseWorldFrameBuffer = nullptr;
+	FrameBuffer* FinalWorldFrameBuffer = nullptr;
 
 	Program* RenderProgram = nullptr;
 	Program* RenderFullscreenProgram = nullptr;
@@ -27,7 +28,7 @@ private:
 	Program* CascadeMergeProgram = nullptr;
 	Mesh* FullscreenQuad = nullptr;
 
-	//GLuint TextureID = 0;
+	glm::mat4 ProjectionView;
 
 	int MaximumCascades = 0;
 
@@ -40,9 +41,6 @@ private:
 
 	int CascadeWidth = 0;
 	int CascadeHeight = 0;
-
-	glm::vec2 SquareAPosition = glm::vec2(293.0f, 66.0f);
-	glm::vec2 SquareBPosition = glm::vec2(293.0f, 400.0f);
 
 	glm::vec2 CalculateIntervalMinMax(int cascade);
 	glm::ivec2 CalculateProbeResolution(int cascade);
@@ -57,6 +55,9 @@ private:
 	};
 
 	void DrawRectangle(Colour* colourData, glm::ivec2 position, glm::ivec2 dimensions, Colour colour);
+	void RenderPaintBrush();
+
+	glm::vec3 HsvToRgb(glm::vec3 hsv);
 
 private:
 

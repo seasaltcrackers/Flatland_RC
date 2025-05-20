@@ -11,7 +11,7 @@ public:
 
 public:
 
-	void Bind();
+	void Bind(bool clear = true);
 	void Unbind();
 
 	GLuint GetTexture();
