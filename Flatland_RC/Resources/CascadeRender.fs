@@ -13,6 +13,7 @@ uniform sampler2D cascadeTexture;
 uniform vec2 cascadeTextureDimensions;
 
 uniform ivec2 cascade0AngleResolution;
+uniform ivec2 cascade0ProbeResolution;
 uniform ivec2 cascade0Dimensions;
 
 vec4 bilinearWeights(vec2 ratio)
@@ -25,13 +26,27 @@ vec4 bilinearWeights(vec2 ratio)
     );
 }
 
+vec2 CalculateRatio(ivec2 probeCoordinates)
+{
+    probeCoordinates -= 1;
+    probeCoordinates %= 2;
+    int index = probeCoordinates.y * 2 + probeCoordinates.x;
+
+    const vec2 test[4] = { vec2(0.25f, 0.25f), vec2(0.75f, 0.25f), vec2(0.25f, 0.75f), vec2(0.75f, 0.75f) };
+    return test[index];
+}
+
+ivec2 TransformThing(ivec2 probeCoordinate)
+{
+    return ivec2(floor((probeCoordinate - 1) * 0.5f));
+}
+
 void main(void)
 {
 	vec4 worldColour = texture(worldTexture, fragTexCoord);
 
-    vec2 cascadePosition = cascade0Dimensions * fragTexCoord;
-    ivec2 topLeftProbeCoordinate = ivec2(floor(cascadePosition / cascade0AngleResolution));
-    vec2 topLeftProbePosition = topLeftProbeCoordinate * cascade0AngleResolution;
+    ivec2 worldPosition = ivec2(floor(worldTextureDimensions * fragTexCoord));
+    ivec2 bottomLeftProbeCoordinate = TransformThing(worldPosition);
 
     vec4 combinedRadiance = vec4(0.0f, 0.0f, 0.0f, 0.0f);
 
@@ -39,24 +54,29 @@ void main(void)
     int probeSampleAmount = bilinearFix ? 2 : 1;
 
     if (bilinearFix)
-    {
-        vec2 toProbeInFromCoordSpace = (cascadePosition / cascade0AngleResolution);
-        vec2 bilinearRatio = fract(toProbeInFromCoordSpace);
         weights = bilinearWeights(bilinearRatio);
+    {        
+        vec2 ratioThing = CalculateRatio(worldPosition);
+        weights = bilinearWeights(ratioThing);
     }
     
     for (int probeOffsetY = 0; probeOffsetY < probeSampleAmount; ++probeOffsetY)
     {
         for (int probeOffsetX = 0; probeOffsetX < probeSampleAmount; ++probeOffsetX)
         {
-            vec2 probeCoordinateOffset = vec2(probeOffsetX, probeOffsetY);
-            vec2 probePositionOffsetTopLeft = topLeftProbePosition + probeCoordinateOffset * cascade0AngleResolution;
+            ivec2 probeCoordinate = bottomLeftProbeCoordinate + ivec2(probeOffsetX, probeOffsetY);
             
+            if (any(lessThan(probeCoordinate, ivec2(0, 0))) || any(greaterThanEqual(probeCoordinate, cascade0ProbeResolution)))
+                continue;
+
+            ivec2 probePositionOffsetBottomLeft = probeCoordinate * cascade0AngleResolution;
+
             for (int directionOffsetY = 0; directionOffsetY < cascade0AngleResolution.y; ++directionOffsetY)
             {
                 for (int directionOffsetX = 0; directionOffsetX < cascade0AngleResolution.x; ++directionOffsetX)
                 {
-                    vec2 samplePosition = probePositionOffsetTopLeft + vec2(directionOffsetX, directionOffsetY);
+                    vec2 samplePosition = probePositionOffsetBottomLeft + vec2(directionOffsetX, directionOffsetY);
+
                     vec4 radiance = texture(cascadeTexture, samplePosition / cascadeTextureDimensions);
                     combinedRadiance += radiance * weights[probeOffsetY * 2 + probeOffsetX];
                 }

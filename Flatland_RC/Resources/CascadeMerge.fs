@@ -137,7 +137,7 @@ vec4 mergeIntervals(vec4 toRadiance, ivec2 toProbeCoordinates, ivec2 fromProbeCo
     //return radiance;
 
     //radiance.a = ceil(radiance.a);
-    return  mergeThing(toRadiance, radiance);
+    return mergeThing(toRadiance, radiance);
 }
 
 vec2 WorldPositionToProbeCoordinate(ivec2 probeResolution, vec2 position)
@@ -180,8 +180,8 @@ void main(void)
     //color = !inRange ? vec4(thing / mergeToProbeResolution, 0, 1) : vec4(1, 1, 1, 1);
 
     //vec2 thing = ivec2(floor(fromProbeCoord));
-    //vec2 thing2 = ivec2(floor(fromProbeCoord + 1));
-    //bool inRange = any(lessThan(thing, ivec2(0, 0))) || any(greaterThanEqual(thing2, mergeFromProbeResolution));
+    //vec2 thing1 = ivec2(floor(fromProbeCoord + 1));
+    //bool inRange = any(lessThan(thing, ivec2(0, 0))) || any(greaterThanEqual(thing1, mergeFromProbeResolution));
     //inRange = false;
-    //color = !inRange ? vec4((thing) / 4.0f, 0, 1) : vec4(1, 1, 1, 1);
+    //color = !inRange ? vec4(0, 0, 0, 1) : vec4(1, 1, 1, 1);
 }

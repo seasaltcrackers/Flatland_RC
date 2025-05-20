@@ -61,17 +61,17 @@ void RadianceCascades::Update()
 
 	glm::mat4 modelA = glm::mat4();
 	modelA = glm::translate(modelA, glm::vec3(SquareAPosition, 0.0f));
-	modelA = glm::scale(modelA, glm::vec3(20.0f, 20.0f, 1.0f));
+	modelA = glm::scale(modelA, glm::vec3(200.0f, 20.0f, 1.0f));
 
 	glm::mat4 modelB = glm::mat4();
 	modelB = glm::translate(modelB, glm::vec3(SquareBPosition, 0.0f));
-	modelB = glm::scale(modelB, glm::vec3(20.0f, 20.0f, 1.0f));
+	modelB = glm::scale(modelB, glm::vec3(200.0f, 20.0f, 1.0f));
 
 	glm::mat4 pvmA = pv * modelA;
 	glm::mat4 pvmB = pv * modelB;
 
 	RenderProgram->SetMatrix("PVM", pvmA);
-	RenderProgram->SetVector("colour", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	RenderProgram->SetVector("colour", glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
 
 	FullscreenQuad->RenderMesh();
 
@@ -171,6 +171,7 @@ void RadianceCascades::Render()
 		CascadeRenderProgram->SetBool("bilinearFix", OutputBilinearFix);
 
 		CascadeRenderProgram->SetIVector("cascade0AngleResolution", Cascade0AngularResolution);
+		CascadeRenderProgram->SetIVector("cascade0ProbeResolution", Cascade0ProbeResolution);
 		CascadeRenderProgram->SetIVector("cascade0Dimensions", Cascade0AngularResolution * Cascade0ProbeResolution);
 
 		CascadeRenderProgram->SetTexture("worldTexture", WorldFrameBuffer->GetTexture());
