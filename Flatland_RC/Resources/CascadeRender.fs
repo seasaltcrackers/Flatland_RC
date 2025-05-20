@@ -54,7 +54,6 @@ void main(void)
     int probeSampleAmount = bilinearFix ? 2 : 1;
 
     if (bilinearFix)
-        weights = bilinearWeights(bilinearRatio);
     {        
         vec2 ratioThing = CalculateRatio(worldPosition);
         weights = bilinearWeights(ratioThing);
