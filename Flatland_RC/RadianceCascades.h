@@ -66,6 +66,11 @@ private:
 	int CurrentStage = 0;
 	bool OutputBilinearFix = true;
 	bool MergeBilinearFix = true;
+	float PaintBrushColour[3];
+
+	bool PaintBrushIsSquare = true;
+	float PaintBrushDimensions[2];
+
 
 };
 

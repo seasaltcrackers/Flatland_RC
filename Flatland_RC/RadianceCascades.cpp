@@ -18,7 +18,7 @@ void RadianceCascades::Initialise(int width, int height)
 	ProjectionView = p * v;
 
 	MaximumCascades = 10;
-	Cascade0IntervalLength = 5.0f;
+	Cascade0IntervalLength = 10.0f;
 	Cascade0AngularResolution = glm::ivec2(4, 4);
 	Cascade0ProbeResolution = glm::ivec2(width, height) / 2;
 
@@ -36,22 +36,53 @@ void RadianceCascades::Initialise(int width, int height)
 	CascadeMergeProgram = Program::GenerateFromFileVsFs("Resources/CascadeMerge.vs", "Resources/CascadeMerge.fs");
 
 	FullscreenQuad = MeshGenerator::GenerateGrid({ 1, 1 }, { 2.0f, -2.0f }, { -1.0f, 1.0f });
+
+	PaintBrushColour[0] = 1.0f;
+	PaintBrushColour[1] = 1.0f;
+	PaintBrushColour[2] = 1.0f;
+
+	PaintBrushDimensions[0] = 20.0f;
+	PaintBrushDimensions[1] = 20.0f;
 }
 
 void RadianceCascades::Update()
 {
+	glClearColor(0.0, 0.0, 0.0, 0.0); // Transparent
+
+
 	ImGui::Begin("Radiance Cascades");
 	ImGui::SliderInt("Maximum Cascades", &MaximumCascades, 1, 16);
 	ImGui::SliderFloat("Interval", &Cascade0IntervalLength, 0.1f, 100.0f);
 	ImGui::Combo("Stage", &CurrentStage, "Final\0Cascades Merged\0Cascades\0World");
 	ImGui::Checkbox("Output Bilinear Interpolate", &OutputBilinearFix);
 	ImGui::Checkbox("Merge Bilinear Interpolate", &MergeBilinearFix);
+	ImGui::ColorPicker3("Drawing Colour", PaintBrushColour);
+
+	ImGui::BeginGroup();
+
+	ImGui::Checkbox("Square Paint Brush", &PaintBrushIsSquare);
+
+	if (PaintBrushIsSquare)
+	{
+		ImGui::SliderFloat("Paint Brush Dimensions", PaintBrushDimensions, 5.0f, 300.0f);
+		PaintBrushDimensions[1] = PaintBrushDimensions[0];
+	}
+	else
+	{
+		ImGui::SliderFloat2("Paint Brush Dimensions", PaintBrushDimensions, 5.0f, 300.0f);
+	}
+
+	ImGui::EndGroup();
+
+	if (ImGui::Button("Clear Canvas"))
+	{
+		// Clear base world buffer
+		BaseWorldFrameBuffer->Bind(true);
+		BaseWorldFrameBuffer->Unbind();
+	}
+
 	ImGui::End();
 
-	glClearColor(0.0, 0.0, 0.0, 0.0); // Black
-
-	//BaseWorldFrameBuffer = new FrameBuffer(Width, Height, true, false);
-	//FinalWorldFrameBuffer = new FrameBuffer(Width, Height, true, false);
 
 	if (Input::IsMouseDown(0) || Input::IsMouseDown(1))
 	{
@@ -222,18 +253,20 @@ void RadianceCascades::RenderPaintBrush()
 
 	glm::mat4 model = glm::mat4();
 	model = glm::translate(model, glm::vec3(position, 0.0f));
-	model = glm::scale(model, glm::vec3(20.0f, 20.0f, 1.0f));
+	model = glm::scale(model, glm::vec3(PaintBrushDimensions[0], PaintBrushDimensions[1], 1.0f));
 
 	glm::mat4 pvm = ProjectionView * model;
 
-	double totalTime = glfwGetTime();
-	glm::vec3 rgb = HsvToRgb({ std::fmodf(totalTime * 10.0f, 360.0f), 1.0f, 1.0f });
+	//double totalTime = glfwGetTime();
+	//glm::vec3 rgb = HsvToRgb({ std::fmodf(totalTime * 10.0f, 360.0f), 1.0f, 1.0f });
+
+	glm::vec4 rgba = glm::vec4(PaintBrushColour[0], PaintBrushColour[1], PaintBrushColour[2], 1.0f);
 
 	if (Input::IsMouseDown(1))
-		rgb = glm::vec3(0, 0, 0);
+		rgba = glm::vec4(0, 0, 0, 0);
 
 	RenderProgram->SetMatrix("PVM", pvm);
-	RenderProgram->SetVector("colour", glm::vec4(rgb, 1.0f));
+	RenderProgram->SetVector("colour", rgba);
 
 	FullscreenQuad->RenderMesh();
 
