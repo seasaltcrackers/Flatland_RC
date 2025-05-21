@@ -24,7 +24,6 @@ private:
 	Program* RenderProgram = nullptr;
 	Program* RenderFullscreenProgram = nullptr;
 	Program* CascadeRenderProgram = nullptr;
-	Program* CascadeGenerateProgram = nullptr;
 	Program* CascadeMergeProgram = nullptr;
 	Mesh* FullscreenQuad = nullptr;
 
@@ -42,22 +41,12 @@ private:
 	int CascadeWidth = 0;
 	int CascadeHeight = 0;
 
+	float CalculateIntervalScale(int cascade);
 	glm::vec2 CalculateIntervalMinMax(int cascade);
 	glm::ivec2 CalculateProbeResolution(int cascade);
 	glm::ivec2 CalculateAngleResolution(int cascade);
 
-	struct Colour
-	{
-		GLubyte R;
-		GLubyte G;
-		GLubyte B;
-		GLubyte A;
-	};
-
-	void DrawRectangle(Colour* colourData, glm::ivec2 position, glm::ivec2 dimensions, Colour colour);
 	void RenderPaintBrush();
-
-	glm::vec3 HsvToRgb(glm::vec3 hsv);
 
 private:
 

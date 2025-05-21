@@ -32,7 +32,6 @@ void RadianceCascades::Initialise(int width, int height)
 	RenderProgram = Program::GenerateFromFileVsFs("Resources/Render.vs", "Resources/Render.fs");
 	RenderFullscreenProgram = Program::GenerateFromFileVsFs("Resources/RenderFullscreen.vs", "Resources/RenderFullscreen.fs");
 	CascadeRenderProgram = Program::GenerateFromFileVsFs("Resources/CascadeRender.vs", "Resources/CascadeRender.fs");
-	CascadeGenerateProgram = Program::GenerateFromFileVsFs("Resources/CascadeGenerate.vs", "Resources/CascadeGenerate.fs");
 	CascadeMergeProgram = Program::GenerateFromFileVsFs("Resources/CascadeMerge.vs", "Resources/CascadeMerge.fs");
 
 	FullscreenQuad = MeshGenerator::GenerateGrid({ 1, 1 }, { 2.0f, -2.0f }, { -1.0f, 1.0f });
@@ -114,20 +113,6 @@ void RadianceCascades::Update()
 
 	CascadesFrameBuffer->Bind();
 
-	CascadeGenerateProgram->BindProgram();
-
-	CascadeGenerateProgram->SetFloat("cascade0IntervalLength", Cascade0IntervalLength);
-	CascadeGenerateProgram->SetIVector("cascade0AngleResolution", Cascade0AngularResolution);
-	CascadeGenerateProgram->SetIVector("cascade0ProbeResolution", Cascade0ProbeResolution);
-	CascadeGenerateProgram->SetVector("cascadeTextureDimensions", glm::vec2(CascadeWidth, CascadeHeight));
-
-	CascadeGenerateProgram->SetTexture("worldTexture", FinalWorldFrameBuffer->GetTexture());
-	CascadeGenerateProgram->SetVector("worldTextureDimensions", glm::vec2{ Width, Height });
-
-	FullscreenQuad->RenderMesh();
-
-	CascadeGenerateProgram->UnbindProgram();
-
 	if (CurrentStage == 2)
 	{
 		CascadesFrameBuffer->Unbind();
@@ -137,10 +122,14 @@ void RadianceCascades::Update()
 
 	CascadeMergeProgram->BindProgram();
 
+	CascadeMergeProgram->SetTexture("worldTexture", FinalWorldFrameBuffer->GetTexture());
+	CascadeMergeProgram->SetVector("worldTextureDimensions", glm::vec2{ Width, Height });
+
 	CascadeMergeProgram->SetTexture("cascadeTexture", CascadesFrameBuffer->GetTexture());
 	CascadeMergeProgram->SetVector("cascadeTextureDimensions", glm::vec2(CascadeWidth, CascadeHeight));
-	CascadeMergeProgram->SetVector("worldTextureDimensions", glm::vec2{ Width, Height });
+	
 	CascadeMergeProgram->SetBool("bilinearFix", MergeBilinearFix);
+	CascadeMergeProgram->SetBool("doMerge", false);
 
 	for (int cascade = MaximumCascades - 2; cascade >= 0; --cascade)
 	{
@@ -156,8 +145,9 @@ void RadianceCascades::Update()
 		float toXScale = xOffset2 - xOffset1;
 		float fromXScale = xOffset3 - xOffset2;
 
+		CascadeMergeProgram->SetVector("mergeToIntervalMinMax", CalculateIntervalMinMax(mergeToCascade));
+
 		CascadeMergeProgram->SetFloat("mergeFromLeftPositionX", xOffset2 * CascadeWidth);
-		CascadeMergeProgram->SetFloat("mergeToLeftPositionX", xOffset1 * CascadeWidth);
 
 		CascadeMergeProgram->SetIVector("mergeFromProbeResolution", CalculateProbeResolution(mergeFromCascade));
 		CascadeMergeProgram->SetIVector("mergeToProbeResolution", CalculateProbeResolution(mergeToCascade));
@@ -165,16 +155,14 @@ void RadianceCascades::Update()
 		CascadeMergeProgram->SetIVector("mergeFromAngleResolution", CalculateAngleResolution(mergeFromCascade));
 		CascadeMergeProgram->SetIVector("mergeToAngleResolution", CalculateAngleResolution(mergeToCascade));
 
-		CascadeMergeProgram->SetInt("mergeFromCascade", mergeFromCascade);
-		CascadeMergeProgram->SetInt("mergeToCascade", mergeToCascade);
-
-		CascadeMergeProgram->SetVector("fromHorizontalTransform", glm::vec2(xOffset2, fromXScale));
 		CascadeMergeProgram->SetVector("toHorizontalTransform", glm::vec2(xOffset1, toXScale));
 
 		FullscreenQuad->RenderMesh();
 
-		// DEBUG
-		//break;
+		// We don't merge the last cascade but merge all subsequent ones
+		// This is because the last cascade has nothing to merge from
+		if (cascade == MaximumCascades - 2)
+			CascadeMergeProgram->SetBool("doMerge", true);
 	}
 
 	CascadeMergeProgram->UnbindProgram();
@@ -198,9 +186,7 @@ void RadianceCascades::Render()
 
 		CascadeRenderProgram->SetIVector("cascade0AngleResolution", Cascade0AngularResolution);
 		CascadeRenderProgram->SetIVector("cascade0ProbeResolution", Cascade0ProbeResolution);
-		CascadeRenderProgram->SetIVector("cascade0Dimensions", Cascade0AngularResolution * Cascade0ProbeResolution);
 
-		CascadeRenderProgram->SetTexture("worldTexture", FinalWorldFrameBuffer->GetTexture());
 		CascadeRenderProgram->SetVector("worldTextureDimensions", glm::vec2{ Width, Height });
 
 		CascadeRenderProgram->SetTexture("cascadeTexture", CascadesFrameBuffer->GetTexture());
@@ -236,15 +222,6 @@ void RadianceCascades::Render()
 	}
 }
 
-void RadianceCascades::DrawRectangle(Colour* colourData, glm::ivec2 position, glm::ivec2 dimensions, Colour colour)
-{
-	for (int y = position.y; y < std::min(position.y + dimensions.y, Height - 1); ++y)
-	{
-		for (int x = position.x; x < std::min(position.x + dimensions.x, Width - 1); ++x)
-			colourData[y * Width + x] = colour;
-	}
-}
-
 void RadianceCascades::RenderPaintBrush()
 {
 	RenderProgram->BindProgram();
@@ -273,75 +250,18 @@ void RadianceCascades::RenderPaintBrush()
 	RenderProgram->UnbindProgram();
 }
 
-glm::vec3 RadianceCascades::HsvToRgb(glm::vec3 hsv)
+float RadianceCascades::CalculateIntervalScale(int cascade)
 {
-	double hh, p, q, t, ff;
-	long i;
-	glm::vec3 out;
+	if (cascade <= 0)
+		return 0.0;
 
-	if (hsv.g <= 0.0) {       // < is bogus, just shuts up warnings
-		out.r = hsv.z;
-		out.g = hsv.z;
-		out.b = hsv.z;
-		return out;
-	}
-
-	hh = hsv.r;
-
-	if (hh >= 360.0) 
-		hh = 0.0;
-
-	hh /= 60.0;
-	i = (long)hh;
-	ff = hh - i;
-	p = hsv.z * (1.0 - hsv.y);
-	q = hsv.z * (1.0 - (hsv.y * ff));
-	t = hsv.z * (1.0 - (hsv.y * (1.0 - ff)));
-
-	switch (i) 
-	{
-		case 0:
-			out.r = hsv.z;
-			out.g = t;
-			out.b = p;
-			break;
-		case 1:
-			out.r = q;
-			out.g = hsv.z;
-			out.b = p;
-			break;
-		case 2:
-			out.r = p;
-			out.g = hsv.z;
-			out.b = t;
-			break;
-
-		case 3:
-			out.r = p;
-			out.g = q;
-			out.b = hsv.z;
-			break;
-		case 4:
-			out.r = t;
-			out.g = p;
-			out.b = hsv.z;
-			break;
-		case 5:
-		default:
-			out.r = hsv.z;
-			out.g = p;
-			out.b = q;
-			break;
-	}
-
-	return out;
+	/* Scale interval by 2x each cascade */
+	return float(1 << (cascade));
 }
 
 glm::vec2 RadianceCascades::CalculateIntervalMinMax(int cascade)
 {
-	float intervalLength = Cascade0IntervalLength * pow(2.0f, cascade);
-	float intervalOffset = intervalLength * (2.0f / 3.0f);
-	return glm::vec2(intervalOffset, intervalOffset + intervalLength);
+	return Cascade0IntervalLength * glm::vec2(CalculateIntervalScale(cascade), CalculateIntervalScale(cascade + 1));
 }
 
 glm::ivec2 RadianceCascades::CalculateProbeResolution(int cascade)

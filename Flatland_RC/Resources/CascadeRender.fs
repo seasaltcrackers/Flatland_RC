@@ -6,7 +6,6 @@ out vec4 color;
 
 uniform bool bilinearFix;
 
-uniform sampler2D worldTexture;
 uniform vec2 worldTextureDimensions;
 
 uniform sampler2D cascadeTexture;
@@ -14,7 +13,6 @@ uniform vec2 cascadeTextureDimensions;
 
 uniform ivec2 cascade0AngleResolution;
 uniform ivec2 cascade0ProbeResolution;
-uniform ivec2 cascade0Dimensions;
 
 vec4 bilinearWeights(vec2 ratio)
 {
@@ -43,8 +41,6 @@ ivec2 TransformThing(ivec2 probeCoordinate)
 
 void main(void)
 {
-	vec4 worldColour = texture(worldTexture, fragTexCoord);
-
     ivec2 worldPosition = ivec2(floor(worldTextureDimensions * fragTexCoord));
     ivec2 bottomLeftProbeCoordinate = TransformThing(worldPosition);
 
