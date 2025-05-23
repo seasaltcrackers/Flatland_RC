@@ -42,6 +42,8 @@ ivec2 TransformThing(ivec2 probeCoordinate)
 void main(void)
 {
     ivec2 worldPosition = ivec2(floor(worldTextureDimensions * fragTexCoord));
+
+    // TODO: This shouldnt assume 2x scaling from world space to cascade0
     ivec2 bottomLeftProbeCoordinate = TransformThing(worldPosition);
 
     vec4 combinedRadiance = vec4(0.0f, 0.0f, 0.0f, 0.0f);
@@ -50,7 +52,8 @@ void main(void)
     int probeSampleAmount = bilinearFix ? 2 : 1;
 
     if (bilinearFix)
-    {        
+    {
+        // TODO: This shouldnt assume 2x scaling from world space to cascade0
         vec2 ratioThing = CalculateRatio(worldPosition);
         weights = bilinearWeights(ratioThing);
     }
@@ -80,6 +83,5 @@ void main(void)
     }
 
     color = combinedRadiance / (cascade0AngleResolution.x * cascade0AngleResolution.y);
-    color.rgb = pow(color.rgb, 1 / vec3(2.2f, 2.2f, 2.2f));
-
+    color.rgb = pow(color.rgb, 1 / vec3(2.2f, 2.2f, 2.2f)); // TODO: Option to turn off SRGB Calculation
 }

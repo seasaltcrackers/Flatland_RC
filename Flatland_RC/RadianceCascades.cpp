@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <imgui.h>
 #include <gtc/matrix_transform.hpp>
+#include <gtx/string_cast.hpp>
 
 #include "RadianceCascades.h"
 #include "Program.h"
@@ -20,7 +21,7 @@ void RadianceCascades::Initialise(int width, int height)
 	MaximumCascades = 10;
 	Cascade0IntervalLength = 10.0f;
 	Cascade0AngularResolution = glm::ivec2(4, 4);
-	Cascade0ProbeResolution = glm::ivec2(width, height) / 2;
+	Cascade0ProbeResolution = glm::ivec2(Width, Height) / 2;
 
 	CascadeWidth = Cascade0ProbeResolution.x * Cascade0AngularResolution.x * 2;
 	CascadeHeight = Cascade0ProbeResolution.y * Cascade0AngularResolution.y;
@@ -140,10 +141,8 @@ void RadianceCascades::Update()
 
 		float xOffset1 = 1.0f - std::powf(0.5f, mergeToCascade);
 		float xOffset2 = 1.0f - std::powf(0.5f, mergeFromCascade);
-		float xOffset3 = 1.0f - std::powf(0.5f, mergeFromCascade + 1);
 
 		float toXScale = xOffset2 - xOffset1;
-		float fromXScale = xOffset3 - xOffset2;
 
 		CascadeMergeProgram->SetVector("mergeToIntervalMinMax", CalculateIntervalMinMax(mergeToCascade));
 

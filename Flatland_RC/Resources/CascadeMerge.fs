@@ -26,6 +26,8 @@ uniform vec2 cascadeTextureDimensions;
 uniform sampler2D worldTexture;
 uniform vec2 worldTextureDimensions;
 
+// Return rgb value is the colour of the first solid pixel
+// The alpha value is 0 if it hit something, 1 if it didnt
 vec4 Raycast(vec2 rayOrigin, vec2 rayDirection, float intervalMin, float intervalMax)
 {
     vec2 from = rayOrigin + rayDirection * intervalMin;
@@ -102,41 +104,37 @@ vec4 Raycast(vec2 rayOrigin, vec2 rayDirection, float intervalMin, float interva
     return vec4(color.rgb, 1.0f); // 1 means it hit nothing
 }
 
-vec4 mergeThing(vec4 near, vec4 far)
+vec4 MergeRadiance(vec4 near, vec4 far)
 {   
     vec3 radiance = near.rgb + (far.rgb * near.a);
     return vec4(radiance, near.a * far.a);
 }
 
-vec4 bilinearWeights(vec2 ratio)
-{
-    return vec4(
-        (1.0f - ratio.x) * (1.0f - ratio.y),
-        ratio.x * (1.0f - ratio.y),
-        (1.0f - ratio.x) * ratio.y,
-        ratio.x * ratio.y
-        );
-}
+// Weights for smooth merging between cascades
+// All 4 numbers add up to 1
+const vec4 ProbeIndexToBilinearWeights[4] = { 
+    vec4(0.5625f, 0.1875f, 0.1875f, 0.0625f), 
+    vec4(0.1875f, 0.5625f, 0.0625f, 0.1875f), 
+    vec4(0.1875f, 0.0625f, 0.5625f, 0.1875f), 
+    vec4(0.0625f, 0.1875f, 0.1875f, 0.5625f) };
 
-vec2 CalculateRatio(ivec2 probeCoordinates)
+vec4 CalculateBilinearWeightsFromProbeCoordinate(ivec2 probeCoordinates)
 {
-    probeCoordinates -= 1;
-    probeCoordinates %= 2;
+    probeCoordinates -= 1; // - 1 because edges (e.g. 0, 0) are in the top right of their quadrant rather than the bottom left
+    probeCoordinates %= 2; // Modulos with 2 so that we get the local coordinate within each quadrant
+
+    // Use pre calculated weights, these are always the same for 2x scaling
     int index = probeCoordinates.y * 2 + probeCoordinates.x;
-
-    const vec2 test[4] = { vec2(0.25f, 0.25f), vec2(0.75f, 0.25f), vec2(0.25f, 0.75f), vec2(0.75f, 0.75f) };
-    return test[index];
+    return ProbeIndexToBilinearWeights[index];
 }
 
-
-vec4 mergeIntervals(vec4 toRadiance, ivec2 toProbeCoordinates, ivec2 fromProbeCoordinates, int mergeToAngleIndex)
+vec4 SampleAverageRadianceFromNextCascade(ivec2 toProbeCoordinates, ivec2 fromBottomLeftProbeCoordinates, int mergeToAngleIndex)
 {
     vec4 weights = vec4(0.25f, 0.25f, 0.25f, 0.25f);
 
     if (bilinearFix)
     {
-        vec2 ratioThing = CalculateRatio(toProbeCoordinates);
-        weights = bilinearWeights(ratioThing);
+        weights = CalculateBilinearWeightsFromProbeCoordinate(toProbeCoordinates);
     }
 
     vec4 radiance = vec4(0.0f, 0.0f, 0.0f, 0.0f);
@@ -146,9 +144,10 @@ vec4 mergeIntervals(vec4 toRadiance, ivec2 toProbeCoordinates, ivec2 fromProbeCo
     {
         for (int xOffset = 0; xOffset < 2; ++xOffset)
         {
-            ivec2 probeOffset = ivec2(xOffset, yOffset);
-            ivec2 probeCoordinate = (fromProbeCoordinates + probeOffset);
+            ivec2 probeCoordinate = fromBottomLeftProbeCoordinates + ivec2(xOffset, yOffset);
             
+            // If probe coordinate is out of bounds (happens at the edges of the screen) then we assume empty/black and skip
+            // Could clamp here instead, or perhaps some environmental colour
             if (any(lessThan(probeCoordinate, ivec2(0, 0))) || any(greaterThanEqual(probeCoordinate, mergeFromProbeResolution)))
                 continue;
 
@@ -173,25 +172,17 @@ vec4 mergeIntervals(vec4 toRadiance, ivec2 toProbeCoordinates, ivec2 fromProbeCo
 
     // Normalize radiance
     // Only dividing by 2 because the weights handles the 4x extra samples that occur for each direction
-    radiance /= 2.0f;
-    return mergeThing(toRadiance, radiance);
+    return radiance / 2.0f;
 }
 
-vec2 WorldPositionToProbeCoordinate(ivec2 probeResolution, vec2 position)
-{
-    // Divide by resolution + 2 so the grid sits away from the edges of the screen
-    vec2 probeSpacing = worldTextureDimensions / (probeResolution + 1);
-
-    // Subtract 1 here because otherwise it would be the coordinates would start flush from the top left corner
-    return position / probeSpacing - 1;
-}
-
-ivec2 TransformThing(ivec2 probeCoordinate)
+// Will return out of bounds coordinates in the bottom left sides
+// This is correct because of how the next cascades probe are laid out inbetween the previous ones
+ivec2 ProbeCoordinateToBottomLeftOfNextCascade(ivec2 probeCoordinate)
 {
     return ivec2(floor((probeCoordinate - 1) * 0.5f));
 }
 
-vec2 ProbeCoordinateToWorldPosition(ivec2 probeResolution, ivec2 coords)
+vec2 ProbeCoordinateToWorldCenterPosition(ivec2 probeResolution, ivec2 coords)
 {
     // Divide by resolution + 1 so the grid sits away from the edges of the screen
     vec2 probeSpacing = worldTextureDimensions / (probeResolution + 1);
@@ -217,15 +208,18 @@ void main(void)
     vec2 rayDirection = vec2(cos(rayAngle), sin(rayAngle));
     
     ivec2 toProbeCoord = ivec2(floor(toProbeCoordInput));
-    ivec2 fromProbeCoord = TransformThing(toProbeCoord);// ivec2(floor(WorldPositionToProbeCoordinate(mergeFromProbeResolution, worldPosition)));
+    ivec2 fromBottomLeftProbeCoord = ProbeCoordinateToBottomLeftOfNextCascade(toProbeCoord);
 
-    vec2 probeCenterWorldPosition = ProbeCoordinateToWorldPosition(mergeToProbeResolution, toProbeCoord);
-
+    vec2 probeCenterWorldPosition = ProbeCoordinateToWorldCenterPosition(mergeToProbeResolution, toProbeCoord);
     vec4 finalRadiance = Raycast(probeCenterWorldPosition, rayDirection, mergeToIntervalMinMax.x, mergeToIntervalMinMax.y);
 
-    // We don't need to waste samples merging if its the first one (ie nothing to merge), we just want to write the cast directly
     if (doMerge)
-        finalRadiance = mergeIntervals(finalRadiance, toProbeCoord, ivec2(floor(fromProbeCoord)), toAngleIndex);
+    {
+        // We only samples next cascade if there is something to sample. 
+        // If its the first one (ie nothing to merge), we just want to write the cast directly
+        vec4 nextCascadesRadiance = SampleAverageRadianceFromNextCascade(toProbeCoord, fromBottomLeftProbeCoord, toAngleIndex);
+        finalRadiance = MergeRadiance(finalRadiance, nextCascadesRadiance);
+    }
     
     color = finalRadiance;
 }
