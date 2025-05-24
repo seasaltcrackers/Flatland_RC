@@ -53,8 +53,9 @@ private:
 	// IMGUI:
 
 	int CurrentStage = 0;
-	bool OutputBilinearFix = true;
-	bool MergeBilinearFix = true;
+	int SampleType = 2;
+	bool OutputEnableSRGB = true;
+	bool MergeBilinearInterpolation = true;
 	float PaintBrushColour[3];
 
 	bool PaintBrushIsSquare = true;

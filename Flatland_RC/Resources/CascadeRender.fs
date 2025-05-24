@@ -4,7 +4,8 @@ in vec2 fragTexCoord;
 
 out vec4 color;
 
-uniform bool bilinearFix;
+uniform int sampleType;
+uniform bool enableSRGB;
 
 uniform vec2 worldTextureDimensions;
 
@@ -14,7 +15,7 @@ uniform vec2 cascadeTextureDimensions;
 uniform ivec2 cascade0AngleResolution;
 uniform ivec2 cascade0ProbeResolution;
 
-vec4 bilinearWeights(vec2 ratio)
+vec4 BilinearWeights(vec2 ratio)
 {
     return vec4(
         (1.0f - ratio.x) * (1.0f - ratio.y),
@@ -24,40 +25,45 @@ vec4 bilinearWeights(vec2 ratio)
     );
 }
 
-vec2 CalculateRatio(ivec2 probeCoordinates)
+vec2 WorldPositionToProbeCoordinate(vec2 worldPosition, ivec2 probeResolution)
 {
-    probeCoordinates -= 1;
-    probeCoordinates %= 2;
-    int index = probeCoordinates.y * 2 + probeCoordinates.x;
-
-    const vec2 test[4] = { vec2(0.25f, 0.25f), vec2(0.75f, 0.25f), vec2(0.25f, 0.75f), vec2(0.75f, 0.75f) };
-    return test[index];
-}
-
-ivec2 TransformThing(ivec2 probeCoordinate)
-{
-    return ivec2(floor((probeCoordinate - 1) * 0.5f));
+    vec2 probeSpacing = worldTextureDimensions / probeResolution;
+    return (worldPosition / probeSpacing) - 0.5f;
 }
 
 void main(void)
 {
-    ivec2 worldPosition = ivec2(floor(worldTextureDimensions * fragTexCoord));
+    vec2 worldPosition = worldTextureDimensions * fragTexCoord;
+    vec2 probeCoordinate = WorldPositionToProbeCoordinate(worldPosition, cascade0ProbeResolution);
 
-    // TODO: This shouldnt assume 2x scaling from world space to cascade0
-    ivec2 bottomLeftProbeCoordinate = TransformThing(worldPosition);
+    ivec2 bottomLeftProbeCoordinate = ivec2(0, 0);
+    vec4 weights = vec4(0, 0, 0, 0);
+    int probeSampleAmount = 0;
 
-    vec4 combinedRadiance = vec4(0.0f, 0.0f, 0.0f, 0.0f);
-
-    vec4 weights = vec4(1.0f, 1.0f, 1.0f, 1.0f);
-    int probeSampleAmount = bilinearFix ? 2 : 1;
-
-    if (bilinearFix)
+    if (sampleType == 0)
     {
-        // TODO: This shouldnt assume 2x scaling from world space to cascade0
-        vec2 ratioThing = CalculateRatio(worldPosition);
-        weights = bilinearWeights(ratioThing);
+        // Nearest Neighbour
+        bottomLeftProbeCoordinate = ivec2(round(probeCoordinate));
+        weights = vec4(1.0f, 1.0f, 1.0f, 1.0f);
+        probeSampleAmount = 1;
+    }
+    else if (sampleType == 1)
+    {
+        // Average
+        bottomLeftProbeCoordinate = ivec2(floor(probeCoordinate));
+        weights = vec4(0.25f, 0.25f, 0.25f, 0.25f);
+        probeSampleAmount = 2;
+    }
+    else if (sampleType == 2)
+    {
+        // Bilinear Interpolation
+        bottomLeftProbeCoordinate = ivec2(floor(probeCoordinate));
+        weights = BilinearWeights(fract(probeCoordinate));
+        probeSampleAmount = 2;
     }
     
+    vec4 combinedRadiance = vec4(0.0f, 0.0f, 0.0f, 0.0f);
+
     for (int probeOffsetY = 0; probeOffsetY < probeSampleAmount; ++probeOffsetY)
     {
         for (int probeOffsetX = 0; probeOffsetX < probeSampleAmount; ++probeOffsetX)
@@ -83,5 +89,7 @@ void main(void)
     }
 
     color = combinedRadiance / (cascade0AngleResolution.x * cascade0AngleResolution.y);
-    color.rgb = pow(color.rgb, 1 / vec3(2.2f, 2.2f, 2.2f)); // TODO: Option to turn off SRGB Calculation
+
+    if (enableSRGB)
+        color.rgb = pow(color.rgb, 1 / vec3(2.2f, 2.2f, 2.2f)); // TODO: Option to turn off SRGB Calculation
 }

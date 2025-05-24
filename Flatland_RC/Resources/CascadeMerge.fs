@@ -8,7 +8,7 @@ in vec2 toPixelCoordInput;
 out vec4 color;
 
 uniform bool doMerge;
-uniform bool bilinearFix;
+uniform bool bilinearInterpolation;
 
 uniform vec2 mergeToIntervalMinMax;
 
@@ -132,10 +132,8 @@ vec4 SampleAverageRadianceFromNextCascade(ivec2 toProbeCoordinates, ivec2 fromBo
 {
     vec4 weights = vec4(0.25f, 0.25f, 0.25f, 0.25f);
 
-    if (bilinearFix)
-    {
+    if (bilinearInterpolation)
         weights = CalculateBilinearWeightsFromProbeCoordinate(toProbeCoordinates);
-    }
 
     vec4 radiance = vec4(0.0f, 0.0f, 0.0f, 0.0f);
 
@@ -184,11 +182,8 @@ ivec2 ProbeCoordinateToBottomLeftOfNextCascade(ivec2 probeCoordinate)
 
 vec2 ProbeCoordinateToWorldCenterPosition(ivec2 probeResolution, ivec2 coords)
 {
-    // Divide by resolution + 1 so the grid sits away from the edges of the screen
-    vec2 probeSpacing = worldTextureDimensions / (probeResolution + 1);
-
-    // Add 1 here because otherwise it would be the coordinates would start flush from the top left corner
-    return probeSpacing * (coords + 1);
+    vec2 probeSpacing = worldTextureDimensions / probeResolution;
+    return probeSpacing * (coords + 0.5f);
 }
 
 void main(void)

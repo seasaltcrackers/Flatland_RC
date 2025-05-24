@@ -54,8 +54,9 @@ void RadianceCascades::Update()
 	ImGui::SliderInt("Maximum Cascades", &MaximumCascades, 1, 16);
 	ImGui::SliderFloat("Interval", &Cascade0IntervalLength, 0.1f, 100.0f);
 	ImGui::Combo("Stage", &CurrentStage, "Final\0Cascades Merged\0Cascades\0World");
-	ImGui::Checkbox("Output Bilinear Interpolate", &OutputBilinearFix);
-	ImGui::Checkbox("Merge Bilinear Interpolate", &MergeBilinearFix);
+	ImGui::Combo("Sample", &SampleType, "Nearest\0Average\0Bilinear");
+	ImGui::Checkbox("Enable sRGB", &OutputEnableSRGB);
+	ImGui::Checkbox("Merge Bilinear Interpolate", &MergeBilinearInterpolation);
 	ImGui::ColorPicker3("Drawing Colour", PaintBrushColour);
 
 	ImGui::BeginGroup();
@@ -129,7 +130,7 @@ void RadianceCascades::Update()
 	CascadeMergeProgram->SetTexture("cascadeTexture", CascadesFrameBuffer->GetTexture());
 	CascadeMergeProgram->SetVector("cascadeTextureDimensions", glm::vec2(CascadeWidth, CascadeHeight));
 	
-	CascadeMergeProgram->SetBool("bilinearFix", MergeBilinearFix);
+	CascadeMergeProgram->SetBool("bilinearInterpolation", MergeBilinearInterpolation);
 	CascadeMergeProgram->SetBool("doMerge", false);
 
 	for (int cascade = MaximumCascades - 2; cascade >= 0; --cascade)
@@ -139,14 +140,14 @@ void RadianceCascades::Update()
 		int mergeFromCascade = cascade + 1;
 		int mergeToCascade = cascade;
 
-		float xOffset1 = 1.0f - std::powf(0.5f, mergeToCascade);
-		float xOffset2 = 1.0f - std::powf(0.5f, mergeFromCascade);
+		float xOffsetTo = 1.0f - std::powf(0.5f, mergeToCascade);
+		float xOffsetFrom = 1.0f - std::powf(0.5f, mergeFromCascade);
 
-		float toXScale = xOffset2 - xOffset1;
+		float toXScale = xOffsetFrom - xOffsetTo;
 
 		CascadeMergeProgram->SetVector("mergeToIntervalMinMax", CalculateIntervalMinMax(mergeToCascade));
 
-		CascadeMergeProgram->SetFloat("mergeFromLeftPositionX", xOffset2 * CascadeWidth);
+		CascadeMergeProgram->SetFloat("mergeFromLeftPositionX", xOffsetFrom * CascadeWidth);
 
 		CascadeMergeProgram->SetIVector("mergeFromProbeResolution", CalculateProbeResolution(mergeFromCascade));
 		CascadeMergeProgram->SetIVector("mergeToProbeResolution", CalculateProbeResolution(mergeToCascade));
@@ -154,7 +155,7 @@ void RadianceCascades::Update()
 		CascadeMergeProgram->SetIVector("mergeFromAngleResolution", CalculateAngleResolution(mergeFromCascade));
 		CascadeMergeProgram->SetIVector("mergeToAngleResolution", CalculateAngleResolution(mergeToCascade));
 
-		CascadeMergeProgram->SetVector("toHorizontalTransform", glm::vec2(xOffset1, toXScale));
+		CascadeMergeProgram->SetVector("toHorizontalTransform", glm::vec2(xOffsetTo, toXScale));
 
 		FullscreenQuad->RenderMesh();
 
@@ -181,7 +182,8 @@ void RadianceCascades::Render()
 
 		CascadeRenderProgram->BindProgram();
 
-		CascadeRenderProgram->SetBool("bilinearFix", OutputBilinearFix);
+		CascadeRenderProgram->SetInt("sampleType", SampleType);
+		CascadeRenderProgram->SetBool("enableSRGB", OutputEnableSRGB);
 
 		CascadeRenderProgram->SetIVector("cascade0AngleResolution", Cascade0AngularResolution);
 		CascadeRenderProgram->SetIVector("cascade0ProbeResolution", Cascade0ProbeResolution);
