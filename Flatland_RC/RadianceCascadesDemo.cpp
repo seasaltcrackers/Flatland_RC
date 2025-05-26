@@ -3,26 +3,31 @@
 #include <gtc/matrix_transform.hpp>
 #include <gtx/string_cast.hpp>
 
-#include "RadianceCascades.h"
+#include "RadianceCascadesDemo.h"
 #include "Program.h"
 #include "MeshGenerator.h"
 #include "FrameBuffer.h"
 #include "Input.h"
 
-void RadianceCascades::Initialise(int width, int height)
+void RadianceCascadesDemo::Initialise(int width, int height, glm::ivec2 cascade0AngularResolution, int cascade0ProbeSpacing)
 {
 	Width = width;
 	Height = height;
+
+	// Calculate the dimensions to the nearest power of 2 this is to ensure probes resolution can scale down correctly by 2x with each cascade while still allowing for arbitrary canvas sizes
+	glm::vec2 dimensionExponents = glm::log2(glm::vec2(width, height));
+	glm::ivec2 dimensionExponentsRounded = glm::round(dimensionExponents);
+	glm::ivec2 dimensionsToNearestPower = glm::ivec2(std::pow(2, dimensionExponentsRounded.x), std::pow(2, dimensionExponentsRounded.y));
 
 	glm::mat4 p = glm::ortho(0.0f, (float)Width, 0.0f, (float)Height, -0.1f, 1000.0f);
 	glm::mat4 v = glm::lookAt(glm::vec3(0.0f, 0.0f, 10.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	ProjectionView = p * v;
 
 	MaximumCascades = 10;
-	Cascade0IntervalLength = 10.0f;
-	Cascade0AngularResolution = glm::ivec2(4, 4);
-	Cascade0ProbeResolution = glm::ivec2(Width, Height) / 2;
-
+	Cascade0IntervalLength = 5.0f;
+	Cascade0AngularResolution = cascade0AngularResolution;
+	Cascade0ProbeResolution = dimensionsToNearestPower / cascade0ProbeSpacing; // Attempt to go for 1 probe per 2 pixels as close as possible
+	
 	CascadeWidth = Cascade0ProbeResolution.x * Cascade0AngularResolution.x * 2;
 	CascadeHeight = Cascade0ProbeResolution.y * Cascade0AngularResolution.y;
 
@@ -41,20 +46,21 @@ void RadianceCascades::Initialise(int width, int height)
 	PaintBrushColour[1] = 1.0f;
 	PaintBrushColour[2] = 1.0f;
 
-	PaintBrushDimensions[0] = 20.0f;
-	PaintBrushDimensions[1] = 20.0f;
+	PaintBrushDimensions[0] = 10.0f;
+	PaintBrushDimensions[1] = 10.0f;
 }
 
-void RadianceCascades::Update()
+void RadianceCascadesDemo::Update()
 {
 	glClearColor(0.0, 0.0, 0.0, 0.0); // Transparent
 
 
 	ImGui::Begin("Radiance Cascades");
-	ImGui::SliderInt("Maximum Cascades", &MaximumCascades, 1, 16);
+	ImGui::SliderInt("Maximum Cascades", &MaximumCascades, 1, 10);
 	ImGui::SliderFloat("Interval", &Cascade0IntervalLength, 0.1f, 100.0f);
-	ImGui::Combo("Stage", &CurrentStage, "Final\0Cascades Merged\0Cascades\0World");
+	ImGui::Combo("Stage", &CurrentStage, "Final\0Cascades Merged\0World");
 	ImGui::Combo("Sample", &SampleType, "Nearest\0Average\0Bilinear");
+	ImGui::Checkbox("Enable Bilinear Fix", &EnableBilinearFix);
 	ImGui::Checkbox("Enable sRGB", &OutputEnableSRGB);
 	ImGui::Checkbox("Merge Bilinear Interpolate", &MergeBilinearInterpolation);
 	ImGui::ColorPicker3("Drawing Colour", PaintBrushColour);
@@ -93,7 +99,7 @@ void RadianceCascades::Update()
 
 		BaseWorldFrameBuffer->Unbind();
 
-		glMemoryBarrier(GL_ALL_BARRIER_BITS);
+		glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
 	}
 
 	FinalWorldFrameBuffer->Bind();
@@ -111,16 +117,9 @@ void RadianceCascades::Update()
 
 	FinalWorldFrameBuffer->Unbind();
 
-	glMemoryBarrier(GL_ALL_BARRIER_BITS);
+	glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
 
 	CascadesFrameBuffer->Bind();
-
-	if (CurrentStage == 2)
-	{
-		CascadesFrameBuffer->Unbind();
-		glClearColor(1.0, 0.0, 0.0, 1.0); // Red
-		return;
-	}
 
 	CascadeMergeProgram->BindProgram();
 
@@ -130,12 +129,13 @@ void RadianceCascades::Update()
 	CascadeMergeProgram->SetTexture("cascadeTexture", CascadesFrameBuffer->GetTexture());
 	CascadeMergeProgram->SetVector("cascadeTextureDimensions", glm::vec2(CascadeWidth, CascadeHeight));
 	
+	CascadeMergeProgram->SetBool("enableBilinearFix", EnableBilinearFix);
 	CascadeMergeProgram->SetBool("bilinearInterpolation", MergeBilinearInterpolation);
 	CascadeMergeProgram->SetBool("doMerge", false);
 
 	for (int cascade = MaximumCascades - 2; cascade >= 0; --cascade)
 	{
-		glMemoryBarrier(GL_ALL_BARRIER_BITS);
+		glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
 
 		int mergeFromCascade = cascade + 1;
 		int mergeToCascade = cascade;
@@ -168,12 +168,10 @@ void RadianceCascades::Update()
 	CascadeMergeProgram->UnbindProgram();
 	CascadesFrameBuffer->Unbind();
 
-	glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
 	glClearColor(1.0, 0.0, 0.0, 1.0); // Red
 }
 
-void RadianceCascades::Render()
+void RadianceCascadesDemo::Render()
 {
 	// Final
 	if (CurrentStage == 0)
@@ -198,7 +196,7 @@ void RadianceCascades::Render()
 		CascadeRenderProgram->UnbindProgram();
 	}
 	// Cascades
-	else if (CurrentStage == 1 || CurrentStage == 2)
+	else if (CurrentStage == 1)
 	{
 		glViewport(0, 0, CascadeWidth, CascadeHeight);
 
@@ -210,7 +208,7 @@ void RadianceCascades::Render()
 		RenderFullscreenProgram->UnbindProgram();
 	}
 	// World
-	else if (CurrentStage == 3)
+	else if (CurrentStage == 2)
 	{
 		glViewport(0, 0, Width, Height);
 
@@ -223,7 +221,7 @@ void RadianceCascades::Render()
 	}
 }
 
-void RadianceCascades::RenderPaintBrush()
+void RadianceCascadesDemo::RenderPaintBrush()
 {
 	RenderProgram->BindProgram();
 
@@ -232,14 +230,11 @@ void RadianceCascades::RenderPaintBrush()
 	glm::mat4 model = glm::mat4();
 	model = glm::translate(model, glm::vec3(position, 0.0f));
 	model = glm::scale(model, glm::vec3(PaintBrushDimensions[0], PaintBrushDimensions[1], 1.0f));
-
 	glm::mat4 pvm = ProjectionView * model;
-
-	//double totalTime = glfwGetTime();
-	//glm::vec3 rgb = HsvToRgb({ std::fmodf(totalTime * 10.0f, 360.0f), 1.0f, 1.0f });
 
 	glm::vec4 rgba = glm::vec4(PaintBrushColour[0], PaintBrushColour[1], PaintBrushColour[2], 1.0f);
 
+	// Erase on right click
 	if (Input::IsMouseDown(1))
 		rgba = glm::vec4(0, 0, 0, 0);
 
@@ -251,28 +246,28 @@ void RadianceCascades::RenderPaintBrush()
 	RenderProgram->UnbindProgram();
 }
 
-float RadianceCascades::CalculateIntervalScale(int cascade)
+float RadianceCascadesDemo::CalculateIntervalScale(int cascade)
 {
 	if (cascade <= 0)
 		return 0.0;
 
-	/* Scale interval by 2x each cascade */
+	// Scale interval by 2x each cascade
 	return float(1 << (cascade));
 }
 
-glm::vec2 RadianceCascades::CalculateIntervalMinMax(int cascade)
+glm::vec2 RadianceCascadesDemo::CalculateIntervalMinMax(int cascade)
 {
 	return Cascade0IntervalLength * glm::vec2(CalculateIntervalScale(cascade), CalculateIntervalScale(cascade + 1));
 }
 
-glm::ivec2 RadianceCascades::CalculateProbeResolution(int cascade)
+glm::ivec2 RadianceCascadesDemo::CalculateProbeResolution(int cascade)
 {
 	return glm::ivec2(
 		std::ceilf(Cascade0ProbeResolution.x / std::powf(2.0f, cascade)),
 		std::ceilf(Cascade0ProbeResolution.y / std::powf(2.0f, cascade)));
 }
 
-glm::ivec2 RadianceCascades::CalculateAngleResolution(int cascade)
+glm::ivec2 RadianceCascadesDemo::CalculateAngleResolution(int cascade)
 {
 	return glm::ivec2(
 		Cascade0AngularResolution.x,

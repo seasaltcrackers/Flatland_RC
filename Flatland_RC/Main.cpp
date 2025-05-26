@@ -8,7 +8,7 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 
-#include "RadianceCascades.h"
+#include "RadianceCascadesDemo.h"
 #include "Constants.h"
 #include "Input.h"
 
@@ -16,7 +16,7 @@ void Update();
 void Render();
 void Close();
 
-RadianceCascades* RC = nullptr;
+RadianceCascadesDemo* RC = nullptr;
 GLFWwindow* Window = nullptr;
 
 int main(int argc, char** argv)
@@ -24,7 +24,7 @@ int main(int argc, char** argv)
 	if (!glfwInit())
 		return -1;
 
-	Window = glfwCreateWindow(1500, 700, "Hello World", NULL, NULL);
+	Window = glfwCreateWindow(Constants::WindowWidth, Constants::WindowHeight, "Flatland_RC", NULL, NULL);
 	if (!Window)
 	{
 		glfwTerminate();
@@ -61,8 +61,8 @@ int main(int argc, char** argv)
 	// Sets the clear color when calling glClear()
 	glClearColor(1.0, 0.0, 0.0, 1.0); // Black
 
-	RC = new RadianceCascades();
-	RC->Initialise(Constants::TestFactor, Constants::TestFactor);
+	RC = new RadianceCascadesDemo();
+	RC->Initialise(Constants::WorldWidth, Constants::WorldHeight, glm::ivec2(Constants::Cascade0AngularResolutionX, Constants::Cascade0AngularResolutionY), Constants::Cascade0ProbeSpacing);
 
 
 	while (!glfwWindowShouldClose(Window))

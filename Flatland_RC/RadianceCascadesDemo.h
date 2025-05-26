@@ -6,11 +6,11 @@ class FrameBuffer;
 class Program;
 class Mesh;
 
-class RadianceCascades
+class RadianceCascadesDemo
 {
 public:
 
-	void Initialise(int width, int height);
+	void Initialise(int width, int height, glm::ivec2 cascade0AngularResolution, int cascade0ProbeSpacing);
 
 	void Update();
 	void Render();
@@ -31,7 +31,7 @@ private:
 
 	int MaximumCascades = 0;
 
-	float Cascade0IntervalLength= 0;
+	float Cascade0IntervalLength = 0;
 	glm::ivec2 Cascade0AngularResolution;
 	glm::ivec2 Cascade0ProbeResolution;
 
@@ -53,9 +53,10 @@ private:
 	// IMGUI:
 
 	int CurrentStage = 0;
-	int SampleType = 2;
+	int SampleType = 0;
 	bool OutputEnableSRGB = true;
 	bool MergeBilinearInterpolation = true;
+	bool EnableBilinearFix = true;
 	float PaintBrushColour[3];
 
 	bool PaintBrushIsSquare = true;

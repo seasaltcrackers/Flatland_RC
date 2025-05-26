@@ -65,7 +65,7 @@ void FrameBuffer::Unbind()
 	glFlush();
 	glFinish();
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glViewport(0, 0, Constants::ScreenWidth, Constants::ScreenHeight);
+	glViewport(0, 0, Constants::WindowWidth, Constants::WindowHeight);
 }
 
 GLuint FrameBuffer::GetTexture()

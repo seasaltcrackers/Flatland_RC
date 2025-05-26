@@ -9,6 +9,7 @@ out vec4 color;
 
 uniform bool doMerge;
 uniform bool bilinearInterpolation;
+uniform bool enableBilinearFix;
 
 uniform vec2 mergeToIntervalMinMax;
 
@@ -28,11 +29,8 @@ uniform vec2 worldTextureDimensions;
 
 // Return rgb value is the colour of the first solid pixel
 // The alpha value is 0 if it hit something, 1 if it didnt
-vec4 Raycast(vec2 rayOrigin, vec2 rayDirection, float intervalMin, float intervalMax)
+vec4 Raycast(vec2 from, vec2 to)
 {
-    vec2 from = rayOrigin + rayDirection * intervalMin;
-    vec2 to = rayOrigin + rayDirection * intervalMax;
-
     vec2 delta = abs(to - from);
     ivec2 current = ivec2(floor(from));
 
@@ -128,49 +126,26 @@ vec4 CalculateBilinearWeightsFromProbeCoordinate(ivec2 probeCoordinates)
     return ProbeIndexToBilinearWeights[index];
 }
 
-vec4 SampleAverageRadianceFromNextCascade(ivec2 toProbeCoordinates, ivec2 fromBottomLeftProbeCoordinates, int mergeToAngleIndex)
+vec4 SampleMergedRays(vec2 probeBottomLeftPosition, int startAngleIndex, ivec2 angleResolution, int sampleCount)
 {
-    vec4 weights = vec4(0.25f, 0.25f, 0.25f, 0.25f);
-
-    if (bilinearInterpolation)
-        weights = CalculateBilinearWeightsFromProbeCoordinate(toProbeCoordinates);
-
     vec4 radiance = vec4(0.0f, 0.0f, 0.0f, 0.0f);
 
-    // Loop over every probe to merge in the from cascade
-    for (int yOffset = 0; yOffset < 2; ++yOffset)
+    // Loop over every direction to sample in the from cascade
+    for (int directionOffset = 0; directionOffset < sampleCount; ++directionOffset)
     {
-        for (int xOffset = 0; xOffset < 2; ++xOffset)
-        {
-            ivec2 probeCoordinate = fromBottomLeftProbeCoordinates + ivec2(xOffset, yOffset);
-            
-            // If probe coordinate is out of bounds (happens at the edges of the screen) then we assume empty/black and skip
-            // Could clamp here instead, or perhaps some environmental colour
-            if (any(lessThan(probeCoordinate, ivec2(0, 0))) || any(greaterThanEqual(probeCoordinate, mergeFromProbeResolution)))
-                continue;
+        int angleIndex = startAngleIndex + directionOffset;
 
-            vec2 probeBottomLeftPosition = probeCoordinate * mergeFromAngleResolution;
-            probeBottomLeftPosition.x += mergeFromLeftPositionX;
+        ivec2 angleCoord = ivec2(
+            angleIndex % angleResolution.x,
+            floor(angleIndex / float(angleResolution.x)));
 
-            // Loop over every direction to sample in the from cascade
-            for (int directionOffset = 0; directionOffset < 2; ++directionOffset)
-            {
-                int mergeFromAngleIndex = mergeToAngleIndex * 2 + directionOffset;
+        vec2 samplePosition = probeBottomLeftPosition + angleCoord;
+        vec4 sampleRadiance = texture(cascadeTexture, samplePosition / cascadeTextureDimensions);
 
-                ivec2 mergeFromAngleCoord = ivec2(
-                    mergeFromAngleIndex % mergeFromAngleResolution.x,
-                    floor(mergeFromAngleIndex / float(mergeFromAngleResolution.x)));
-
-                vec2 samplePosition = probeBottomLeftPosition + mergeFromAngleCoord;
-                vec4 fromRadiance = texture(cascadeTexture, samplePosition / cascadeTextureDimensions);
-                radiance += fromRadiance * weights[yOffset * 2 + xOffset];
-            }
-        }
+        radiance += sampleRadiance;
     }
 
-    // Normalize radiance
-    // Only dividing by 2 because the weights handles the 4x extra samples that occur for each direction
-    return radiance / 2.0f;
+    return radiance / sampleCount;
 }
 
 // Will return out of bounds coordinates in the bottom left sides
@@ -186,6 +161,18 @@ vec2 ProbeCoordinateToWorldCenterPosition(ivec2 probeResolution, ivec2 coords)
     return probeSpacing * (coords + 0.5f);
 }
 
+vec2 AngleIndexToRayDirection(int angleIndex, ivec2 angleResolution)
+{
+    // t does not reach 1.0f as angleIndex is 0 based while resolution is not
+    // This is on purpose so we don't raycast 0 & 360 angle
+    float angleT = angleIndex / float(angleResolution.x * angleResolution.y);
+    
+    // Adding 45 degrees so that e.g. the 4 raycasts are offset rather than on the axis aligned
+    float rayAngle = angleT * (M_PI * 2.0f) + (M_PI * 0.25f);
+    vec2 rayDirection = vec2(cos(rayAngle), sin(rayAngle));
+    return rayDirection;
+}
+
 void main(void)
 {
     // Get pixel index
@@ -193,28 +180,96 @@ void main(void)
     angleCoord %= mergeToAngleResolution;
 
     int toAngleIndex = angleCoord.y * mergeToAngleResolution.x + angleCoord.x;
-    
-    // t does not reach 1.0f as angleIndex is 0 based while resolution is not
-    // This is on purpose so we don't raycast 0 & 360 angle
-    float angleT = toAngleIndex / float(mergeToAngleResolution.x * mergeToAngleResolution.y);
-    
-    // Adding 45 degrees so that e.g. the 4 raycasts are offset rather than on the axis aligned
-    float rayAngle = angleT * (M_PI * 2.0f) + (M_PI * 0.25f);
-    vec2 rayDirection = vec2(cos(rayAngle), sin(rayAngle));
-    
+    vec2 rayDirection = AngleIndexToRayDirection(toAngleIndex, mergeToAngleResolution);
+
     ivec2 toProbeCoord = ivec2(floor(toProbeCoordInput));
     ivec2 fromBottomLeftProbeCoord = ProbeCoordinateToBottomLeftOfNextCascade(toProbeCoord);
 
     vec2 probeCenterWorldPosition = ProbeCoordinateToWorldCenterPosition(mergeToProbeResolution, toProbeCoord);
-    vec4 finalRadiance = Raycast(probeCenterWorldPosition, rayDirection, mergeToIntervalMinMax.x, mergeToIntervalMinMax.y);
+    vec4 finalRadiance = vec4(0, 0, 0, 0);
 
-    if (doMerge)
+    vec4 weights = vec4(0.25f, 0.25f, 0.25f, 0.25f);
+
+    if (bilinearInterpolation)
+        weights = CalculateBilinearWeightsFromProbeCoordinate(toProbeCoord);
+
+    if (!enableBilinearFix)
     {
-        // We only samples next cascade if there is something to sample. 
-        // If its the first one (ie nothing to merge), we just want to write the cast directly
-        vec4 nextCascadesRadiance = SampleAverageRadianceFromNextCascade(toProbeCoord, fromBottomLeftProbeCoord, toAngleIndex);
-        finalRadiance = MergeRadiance(finalRadiance, nextCascadesRadiance);
+        vec2 from = probeCenterWorldPosition + rayDirection * mergeToIntervalMinMax.x;
+        vec2 to = probeCenterWorldPosition + rayDirection * mergeToIntervalMinMax.y;
+        
+        vec4 currentCascadesRadiance = Raycast(from, to);
+
+        if (doMerge)
+        {
+            vec4 nextCascadesRadiance = vec4(0.0f, 0.0f, 0.0f, 1.0f);
+            
+            // Loop over every probe to merge in the from cascade
+            for (int yOffset = 0; yOffset < 2; ++yOffset)
+            {
+                for (int xOffset = 0; xOffset < 2; ++xOffset)
+                {
+                    ivec2 probeCoordinate = fromBottomLeftProbeCoord + ivec2(xOffset, yOffset);
+                    
+                    // If probe coordinate is out of bounds (happens at the edges of the screen) then we assume empty/black and skip
+                    // Could clamp here instead, or perhaps some environmental colour
+                    if (any(lessThan(probeCoordinate, ivec2(0, 0))) || any(greaterThanEqual(probeCoordinate, mergeFromProbeResolution)))
+                        continue;
+
+                    vec2 probeBottomLeftPosition = probeCoordinate * mergeFromAngleResolution;
+                    probeBottomLeftPosition.x += mergeFromLeftPositionX;
+
+                    vec4 sampledRadiance = SampleMergedRays(probeBottomLeftPosition, toAngleIndex * 2, mergeFromAngleResolution, 2);
+                    nextCascadesRadiance += sampledRadiance * weights[yOffset * 2 + xOffset];
+                }
+            }
+
+            finalRadiance = MergeRadiance(currentCascadesRadiance, nextCascadesRadiance);
+        }
+        else
+        {
+            finalRadiance = currentCascadesRadiance;
+        }
     }
+    else
+    {
+        vec2 from = probeCenterWorldPosition + rayDirection * mergeToIntervalMinMax.x;
+
+        for (int yOffset = 0; yOffset < 2; ++yOffset)
+        {
+            for (int xOffset = 0; xOffset < 2; ++xOffset)
+            {
+                ivec2 probeCoordinate = fromBottomLeftProbeCoord + ivec2(xOffset, yOffset);
+                
+                // If probe coordinate is out of bounds (happens at the edges of the screen) then we assume empty/black and skip
+                // Could clamp here instead, or perhaps some environmental colour
+                if (any(lessThan(probeCoordinate, ivec2(0, 0))) || any(greaterThanEqual(probeCoordinate, mergeFromProbeResolution)))
+                    continue;
+
+                vec2 fromProbeCenterWorldPosition = ProbeCoordinateToWorldCenterPosition(mergeFromProbeResolution, fromBottomLeftProbeCoord + ivec2(xOffset, yOffset));
+                vec2 to = fromProbeCenterWorldPosition + rayDirection * mergeToIntervalMinMax.y;
+
+                vec4 currentCascadesRadiance = Raycast(from, to);
+
+                //if (currentCascadesRadiance.a == 0.0f)
+                //    continue;
+
+                vec2 probeBottomLeftPosition = probeCoordinate * mergeFromAngleResolution;
+                probeBottomLeftPosition.x += mergeFromLeftPositionX;
+
+                vec4 sampledRadiance = SampleMergedRays(probeBottomLeftPosition, toAngleIndex * 2, mergeFromAngleResolution, 2);
+                finalRadiance += MergeRadiance(currentCascadesRadiance, sampledRadiance) * weights[yOffset * 2 + xOffset];
+            }
+        }
+    }
+
+    //if (doMerge)
+    //{
+    //    // We only samples next cascade if there is something to sample. 
+    //    // If its the first one (ie nothing to merge), we just want to write the cast directly
+    //    vec4 nextCascadesRadiance = SampleAverageRadianceFromNextCascade(toProbeCoord, fromBottomLeftProbeCoord, toAngleIndex);
+    //    finalRadiance = MergeRadiance(finalRadiance, nextCascadesRadiance);
+    //}
     
     color = finalRadiance;
 }

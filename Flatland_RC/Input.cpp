@@ -38,6 +38,9 @@ glm::vec2 Input::GetMousePosition()
 
 bool Input::IsMouseDown(int mouseButton)
 {
+	if (ImGui::GetIO().WantCaptureMouse)
+		return false;
+
 	return glfwGetMouseButton(Window, mouseButton) == GLFW_PRESS;
 }
 
