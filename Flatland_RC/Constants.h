@@ -4,7 +4,6 @@ class Constants
 {
 public:
 
-	
 	static const int WindowWidth = 1200;
 	static const int WindowHeight = 800;
 
