@@ -30,6 +30,7 @@ uniform vec2 worldTextureDimensions;
 // https://playtechs.blogspot.com/2007/03/raytracing-on-grid.html?m=1
 // Return rgb value is the colour of the first solid pixel
 // The alpha value is 0 if it hit something, 1 if it didnt
+// This function is most certainly the bottleneck for performance and could be swapped out for a more efficient approach e.g. raymarching
 vec4 Raycast(vec2 from, vec2 to)
 {
     vec2 delta = abs(to - from);
