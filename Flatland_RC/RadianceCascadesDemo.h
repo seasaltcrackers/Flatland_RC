@@ -10,6 +10,8 @@ class RadianceCascadesDemo
 {
 public:
 
+	~RadianceCascadesDemo();
+
 	void Initialise(int width, int height, glm::ivec2 cascade0AngularResolution, int cascade0ProbeSpacing);
 
 	void Update();
@@ -46,6 +48,7 @@ private:
 	glm::ivec2 CalculateProbeResolution(int cascade);
 	glm::ivec2 CalculateAngleResolution(int cascade);
 
+	void ImGuiInterface();
 	void RenderPaintBrush();
 
 private:

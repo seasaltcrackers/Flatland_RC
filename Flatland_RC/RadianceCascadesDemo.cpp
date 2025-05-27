@@ -9,6 +9,20 @@
 #include "FrameBuffer.h"
 #include "Input.h"
 
+RadianceCascadesDemo::~RadianceCascadesDemo()
+{
+	delete BaseWorldFrameBuffer;
+	delete FinalWorldFrameBuffer;
+	delete CascadesFrameBuffer;
+
+	delete RenderProgram;
+	delete RenderFullscreenProgram;
+	delete CascadeRenderProgram;
+	delete CascadeMergeProgram;
+
+	delete FullscreenQuad;
+}
+
 void RadianceCascadesDemo::Initialise(int width, int height, glm::ivec2 cascade0AngularResolution, int cascade0ProbeSpacing)
 {
 	Width = width;
@@ -54,49 +68,12 @@ void RadianceCascadesDemo::Update()
 {
 	glClearColor(0.0, 0.0, 0.0, 0.0); // Transparent
 
-
-	ImGui::Begin("Radiance Cascades");
-	ImGui::SliderInt("Maximum Cascades", &MaximumCascades, 1, 10);
-	ImGui::SliderFloat("Interval", &Cascade0IntervalLength, 0.1f, 100.0f);
-	ImGui::Combo("Stage", &CurrentStage, "Final\0Cascades Merged\0World");
-	ImGui::Combo("Sample", &SampleType, "Nearest\0Average\0Bilinear");
-	ImGui::Checkbox("Enable Bilinear Fix", &EnableBilinearFix);
-	ImGui::Checkbox("Enable sRGB", &OutputEnableSRGB);
-	ImGui::Checkbox("Merge Bilinear Interpolate", &MergeBilinearInterpolation);
-	ImGui::ColorPicker3("Drawing Colour", PaintBrushColour);
-
-	ImGui::BeginGroup();
-
-	ImGui::Checkbox("Square Paint Brush", &PaintBrushIsSquare);
-
-	if (PaintBrushIsSquare)
-	{
-		ImGui::SliderFloat("Paint Brush Dimensions", PaintBrushDimensions, 5.0f, 300.0f);
-		PaintBrushDimensions[1] = PaintBrushDimensions[0];
-	}
-	else
-	{
-		ImGui::SliderFloat2("Paint Brush Dimensions", PaintBrushDimensions, 5.0f, 300.0f);
-	}
-
-	ImGui::EndGroup();
-
-	if (ImGui::Button("Clear Canvas"))
-	{
-		// Clear base world buffer
-		BaseWorldFrameBuffer->Bind(true);
-		BaseWorldFrameBuffer->Unbind();
-	}
-
-	ImGui::End();
-
+	ImGuiInterface();
 
 	if (Input::IsMouseDown(0) || Input::IsMouseDown(1))
 	{
 		BaseWorldFrameBuffer->Bind(false);
-
 		RenderPaintBrush();
-
 		BaseWorldFrameBuffer->Unbind();
 
 		glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
@@ -168,7 +145,7 @@ void RadianceCascadesDemo::Update()
 	CascadeMergeProgram->UnbindProgram();
 	CascadesFrameBuffer->Unbind();
 
-	glClearColor(1.0, 0.0, 0.0, 1.0); // Red
+	glClearColor(0.25f, 0.25f, 0.25f, 1.0f); // Grey
 }
 
 void RadianceCascadesDemo::Render()
@@ -219,6 +196,44 @@ void RadianceCascadesDemo::Render()
 
 		RenderFullscreenProgram->UnbindProgram();
 	}
+}
+
+void RadianceCascadesDemo::ImGuiInterface()
+{
+	ImGui::Begin("Radiance Cascades");
+	ImGui::SliderInt("Maximum Cascades", &MaximumCascades, 1, 10);
+	ImGui::SliderFloat("Interval", &Cascade0IntervalLength, 0.1f, 100.0f);
+	ImGui::Combo("Stage", &CurrentStage, "Final\0Cascades Merged\0World");
+	ImGui::Combo("Sample", &SampleType, "Nearest\0Average\0Bilinear");
+	ImGui::Checkbox("Enable Bilinear Fix", &EnableBilinearFix);
+	ImGui::Checkbox("Enable sRGB", &OutputEnableSRGB);
+	ImGui::Checkbox("Merge Bilinear Interpolate", &MergeBilinearInterpolation);
+	ImGui::ColorPicker3("Drawing Colour", PaintBrushColour);
+
+	ImGui::BeginGroup();
+
+	ImGui::Checkbox("Square Paint Brush", &PaintBrushIsSquare);
+
+	if (PaintBrushIsSquare)
+	{
+		ImGui::SliderFloat("Paint Brush Dimensions", PaintBrushDimensions, 5.0f, 300.0f);
+		PaintBrushDimensions[1] = PaintBrushDimensions[0];
+	}
+	else
+	{
+		ImGui::SliderFloat2("Paint Brush Dimensions", PaintBrushDimensions, 5.0f, 300.0f);
+	}
+
+	ImGui::EndGroup();
+
+	if (ImGui::Button("Clear Canvas"))
+	{
+		// Clear base world buffer
+		BaseWorldFrameBuffer->Bind(true);
+		BaseWorldFrameBuffer->Unbind();
+	}
+
+	ImGui::End();
 }
 
 void RadianceCascadesDemo::RenderPaintBrush()

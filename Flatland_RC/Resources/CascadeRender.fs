@@ -91,5 +91,5 @@ void main(void)
     color = combinedRadiance / (cascade0AngleResolution.x * cascade0AngleResolution.y);
 
     if (enableSRGB)
-        color.rgb = pow(color.rgb, 1 / vec3(2.2f, 2.2f, 2.2f)); // TODO: Option to turn off SRGB Calculation
+        color.rgb = pow(color.rgb, 1 / vec3(2.2f, 2.2f, 2.2f));
 }
