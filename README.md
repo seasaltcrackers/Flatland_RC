@@ -6,6 +6,12 @@
 - The performance of this demo is limited by the amount of DDA raycasts it does, swapping this out for raymarching would be ideal but is beyond the scope of my goals with this project
 
 
+**How to Run**
+
+- Should just run after opening in visual studio when ran with Debug or Release x64
+- Alternatively you can download the Flatland_RC_Build.zip, unzip and run the executable
+
+
 **Demo Settings/Controls:**
 
 - Edit compile time settings from the Constants.h file. Such as canvas size, probe spacing etc.
